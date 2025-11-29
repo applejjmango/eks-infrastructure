@@ -1,0 +1,61 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "environments/**"
+      - "modules/**"
+      - ".github/workflows/terraform-*.yml"
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        environment: [dev]
+        component: [01-network, 02-eks, 03-addons, 04-applications]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.REMOVED }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: environments/${{ matrix.environment }}/${{ matrix.component }}
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: environments/${{ matrix.environment }}/${{ matrix.component }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: environments/${{ matrix.environment }}/${{ matrix.component }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: environments/${{ matrix.environment }}/${{ matrix.component }}
+        run: terraform apply -auto-approve tfplan
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+      - name: Terraform Apply Status
+        if: always()
+        run: |
+          if [ ${{ job.status }} != 'success' ]; then
+            echo "Terraform Apply failed"
+            exit 1
+          fi
