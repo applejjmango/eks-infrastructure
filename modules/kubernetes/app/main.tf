@@ -59,7 +59,8 @@ resource "kubernetes_storage_class_v1" "gp3" {
   reclaim_policy         = "Delete"
 }
 
-# 기존 gp2를 기본에서 제거
+/* kubectl get sc 시 gp2 없으면 주석처리 
+# 기존 gp2를 기본에서 제거 - # gp2가 default가 아니도록 설정(어노테이션 제거)하는 코드
 resource "kubernetes_annotations" "gp2_remove_default" {
   api_version = "storage.k8s.io/v1"
   kind        = "StorageClass"
@@ -74,6 +75,7 @@ resource "kubernetes_annotations" "gp2_remove_default" {
 
   depends_on = [kubernetes_storage_class_v1.gp3]
 }
+*/
 
 # ===== PVC (Persistent Volume Claim) =====
 # 실무: Deployment용 PVC (ReadWriteOnce)
@@ -199,13 +201,22 @@ resource "kubernetes_deployment_v1" "app" {
           # IfNotPresent: 로컬에 없을 때만 다운로드 (권장)
           # Always: 매번 최신 이미지 확인 (latest 태그 사용 시)
           image_pull_policy = var.image_pull_policy
-
+          # [여기에 emptyDir 마운트 추가]
+          volume_mount {
+            name       = "nginx-cache-vol"
+            mount_path = "/var/cache/nginx"
+          }
+          volume_mount {
+            name       = "nginx-run-vol"
+            mount_path = "/var/run"
+          }
           # 컨테이너 포트
           port {
             name           = "http"
             container_port = var.container_port
             protocol       = "TCP"
           }
+
 
           # 실무 필수: 리소스 요청/제한
           # 왜: requests 없으면 노드 과부하, limits 없으면 다른 Pod 영향
@@ -346,6 +357,15 @@ resource "kubernetes_deployment_v1" "app" {
           content {
             name = image_pull_secrets.value
           }
+        }
+
+        volume {
+          name = "nginx-cache-vol"
+          empty_dir {}
+        }
+        volume {
+          name = "nginx-run-vol"
+          empty_dir {} # 메모리 기반으로 하려면 medium = "Memory" 추가 가능
         }
       }
     }
