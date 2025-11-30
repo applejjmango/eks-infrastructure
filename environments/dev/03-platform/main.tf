@@ -1,6 +1,33 @@
 # (Root Module) Dev Addons - Main
 
 # ============================================
+# Remote State: EKS Cluster
+# ============================================
+data "terraform_remote_state" "eks" {
+  backend = "s3"
+
+  config = {
+    bucket = "plydevops-infra-tf-dev"
+    key    = "dev/02-eks/terraform.tfstate"
+    region = var.aws_region
+  }
+}
+
+# ============================================
+# Remote State: Network Layer
+# ============================================
+data "terraform_remote_state" "network" {
+  backend = "s3"
+
+  config = {
+    bucket = "plydevops-infra-tf-dev"
+    key    = "dev/01-network/terraform.tfstate"
+    region = var.aws_region
+  }
+}
+
+
+# ============================================
 # Local Values
 # ============================================
 locals {
@@ -49,6 +76,8 @@ module "ebs_csi_driver" {
 
   tags = local.common_tags
 }
+
+
 
 /*
 # ============================================

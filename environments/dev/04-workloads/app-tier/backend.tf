@@ -5,7 +5,7 @@
 terraform {
   backend "s3" {
     bucket       = "plydevops-infra-tf-dev"
-    key          = "dev/03-platform/terraform.tfstate"
+    key          = "dev/03-workloads/app-tier/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true
     encrypt      = true
