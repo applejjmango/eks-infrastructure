@@ -1,3 +1,8 @@
+# ============================================
+# EKS Layer - Main Configuration
+# ============================================
+# 리팩토링: Cluster와 Node Group을 별도 모듈로 분리
+# 장점: 독립적 관리, 작은 Blast Radius, 유연한 Node Group 추가/삭제
 
 # ============================================
 # Remote State: Network Layer
@@ -11,7 +16,6 @@ data "terraform_remote_state" "network" {
     region = var.aws_region
   }
 }
-
 
 # ============================================
 # Local Values
@@ -37,7 +41,7 @@ locals {
 }
 
 # ============================================
-# EKS Cluster Module
+# 1️⃣ EKS Cluster Module (Control Plane Only)
 # ============================================
 module "eks_cluster" {
   source = "../../../modules/eks/cluster/"
@@ -61,40 +65,6 @@ module "eks_cluster" {
   # OIDC Provider
   eks_oidc_root_ca_thumbprint = var.eks_oidc_root_ca_thumbprint
 
-  # ============================================
-  # Node Group Type Selection 
-  # ============================================
-  enable_public_node_group  = var.enable_public_node_group
-  enable_private_node_group = var.enable_private_node_group
-
-  # ============================================
-  # Public Node Group Configuration 
-  # ============================================
-  public_node_group_name           = var.public_node_group_name
-  public_node_group_desired_size   = var.public_node_group_desired_size
-  public_node_group_min_size       = var.public_node_group_min_size
-  public_node_group_max_size       = var.public_node_group_max_size
-  public_node_group_instance_types = var.public_node_group_instance_types
-
-  # ============================================
-  # Private Node Group Configuration 
-  # ============================================
-  private_node_group_name           = var.private_node_group_name
-  private_node_group_desired_size   = var.private_node_group_desired_size
-  private_node_group_min_size       = var.private_node_group_min_size
-  private_node_group_max_size       = var.private_node_group_max_size
-  private_node_group_instance_types = var.private_node_group_instance_types
-
-  # ============================================
-  # Shared Node Group Configuration 
-  # ============================================
-  node_group_ami_type        = var.node_group_ami_type
-  node_group_capacity_type   = var.node_group_capacity_type
-  node_group_disk_size       = var.node_group_disk_size
-  node_group_max_unavailable = var.node_group_max_unavailable
-  node_group_keypair         = var.bastion_instance_keypair
-
-
   # Logging
   cluster_enabled_log_types     = var.cluster_enabled_log_types
   cluster_log_retention_in_days = var.cluster_log_retention_in_days
@@ -104,7 +74,110 @@ module "eks_cluster" {
 }
 
 # ============================================
-# Bastion Host Module
+# 2️⃣ Public Node Group (선택적 - 개발/테스트 용도)
+# ============================================
+module "node_group_public" {
+  source = "../../../modules/eks/node-group/"
+  count  = var.enable_public_node_group ? 1 : 0
+
+  # Cluster Information (from cluster module)
+  cluster_name    = module.eks_cluster.cluster_name
+  cluster_version = module.eks_cluster.cluster_version
+
+  # Node Group Configuration
+  name            = local.name
+  node_group_name = var.public_node_group_name
+  node_group_type = "public"
+  subnet_ids      = local.public_subnet_ids
+
+  # Scaling
+  desired_size = var.public_node_group_desired_size
+  min_size     = var.public_node_group_min_size
+  max_size     = var.public_node_group_max_size
+
+  # Instance Configuration
+  instance_types = var.public_node_group_instance_types
+  capacity_type  = var.node_group_capacity_type
+  ami_type       = var.node_group_ami_type
+  disk_size      = var.node_group_disk_size
+
+  # Update Configuration
+  max_unavailable_percentage = var.node_group_max_unavailable
+
+  # SSH Access
+  ssh_key_name = var.bastion_instance_keypair
+
+  # Features
+  enable_ssm        = true
+  enable_cloudwatch = true
+
+  # Kubernetes Labels
+  kubernetes_labels = {
+    Environment  = var.environment
+    WorkloadType = "general"
+  }
+
+  # Tags
+  common_tags = local.common_tags
+
+  # Dependency
+  depends_on = [module.eks_cluster]
+}
+
+# ============================================
+# 3️⃣ Private Node Group (권장 - Production 용도)
+# ============================================
+module "node_group_private" {
+  source = "../../../modules/eks/node-group/"
+  count  = var.enable_private_node_group ? 1 : 0
+
+  # Cluster Information (from cluster module)
+  cluster_name    = module.eks_cluster.cluster_name
+  cluster_version = module.eks_cluster.cluster_version
+
+  # Node Group Configuration
+  name            = local.name
+  node_group_name = var.private_node_group_name
+  node_group_type = "private"
+  subnet_ids      = local.private_subnet_ids
+
+  # Scaling
+  desired_size = var.private_node_group_desired_size
+  min_size     = var.private_node_group_min_size
+  max_size     = var.private_node_group_max_size
+
+  # Instance Configuration
+  instance_types = var.private_node_group_instance_types
+  capacity_type  = var.node_group_capacity_type
+  ami_type       = var.node_group_ami_type
+  disk_size      = var.node_group_disk_size
+
+  # Update Configuration
+  max_unavailable_percentage = var.node_group_max_unavailable
+
+  # SSH Access (Bastion을 통해서만)
+  ssh_key_name                  = var.bastion_instance_keypair
+  ssh_source_security_group_ids = var.enable_bastion ? [module.bastion[0].security_group_id] : []
+
+  # Features
+  enable_ssm        = true
+  enable_cloudwatch = true
+
+  # Kubernetes Labels
+  kubernetes_labels = {
+    Environment  = var.environment
+    WorkloadType = "general"
+  }
+
+  # Tags
+  common_tags = local.common_tags
+
+  # Dependency
+  depends_on = [module.eks_cluster]
+}
+
+# ============================================
+# 4️⃣ Bastion Host Module (선택적)
 # ============================================
 module "bastion" {
   source = "../../../modules/compute/bastion"

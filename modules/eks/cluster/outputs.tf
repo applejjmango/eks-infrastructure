@@ -1,9 +1,10 @@
 # ============================================
-# EKS Cluster Module Outputs
+# EKS Cluster Module - Outputs
 # ============================================
+# 리팩토링: Node Group outputs 모두 제거, Cluster + OIDC Provider만 유지
 
 # ============================================
-# Cluster
+# Cluster Outputs
 # ============================================
 output "cluster_id" {
   description = "EKS cluster ID"
@@ -26,7 +27,7 @@ output "cluster_endpoint" {
 }
 
 output "cluster_version" {
-  description = "Kubernetes version"
+  description = "Kubernetes version of the cluster"
   value       = aws_eks_cluster.cluster.version
 }
 
@@ -36,13 +37,13 @@ output "cluster_platform_version" {
 }
 
 output "cluster_certificate_authority_data" {
-  description = "Base64 encoded certificate data"
+  description = "Base64 encoded certificate data required for cluster authentication"
   value       = aws_eks_cluster.cluster.certificate_authority[0].data
   sensitive   = true
 }
 
 output "cluster_security_group_id" {
-  description = "Security group ID attached to the EKS cluster"
+  description = "Security group ID attached to the EKS cluster (auto-created by EKS)"
   value       = aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id
 }
 
@@ -52,20 +53,20 @@ output "cluster_oidc_issuer_url" {
 }
 
 # ============================================
-# OIDC Provider
+# OIDC Provider Outputs
 # ============================================
 output "oidc_provider_arn" {
-  description = "ARN of the OIDC Provider for EKS"
+  description = "ARN of the OIDC Provider for EKS (used for IRSA)"
   value       = aws_iam_openid_connect_provider.cluster.arn
 }
 
 output "oidc_provider" {
-  description = "OIDC provider URL without https://"
+  description = "OIDC provider URL without https:// prefix (used for IAM trust policies)"
   value       = local.oidc_provider
 }
 
 # ============================================
-# IAM Roles
+# IAM Role Outputs
 # ============================================
 output "cluster_iam_role_name" {
   description = "IAM role name of the EKS cluster"
@@ -75,103 +76,4 @@ output "cluster_iam_role_name" {
 output "cluster_iam_role_arn" {
   description = "IAM role ARN of the EKS cluster"
   value       = aws_iam_role.cluster.arn
-}
-
-output "node_group_iam_role_name" {
-  description = "IAM role name of the EKS node group"
-  value       = aws_iam_role.node_group.name
-}
-
-output "node_group_iam_role_arn" {
-  description = "IAM role ARN of the EKS node group"
-  value       = aws_iam_role.node_group.arn
-}
-
-# ============================================
-# Node Group Outputs - PUBLIC
-# ============================================
-output "public_node_group_id" {
-  description = "Public Node Group ID"
-  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].id : null
-}
-
-output "public_node_group_arn" {
-  description = "Public Node Group ARN"
-  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].arn : null
-}
-
-output "public_node_group_status" {
-  description = "Public Node Group status"
-  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].status : null
-}
-
-output "public_node_group_version" {
-  description = "Public Node Group Kubernetes version"
-  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].version : null
-}
-
-# ============================================
-# Node Group Outputs - PRIVATE
-# ============================================
-output "private_node_group_id" {
-  description = "Private Node Group ID"
-  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].id : null
-}
-
-output "private_node_group_arn" {
-  description = "Private Node Group ARN"
-  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].arn : null
-}
-
-output "private_node_group_status" {
-  description = "Private Node Group status"
-  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].status : null
-}
-
-output "private_node_group_version" {
-  description = "Private Node Group Kubernetes version"
-  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].version : null
-}
-
-# ============================================
-# Unified Output (Backward Compatibility)
-# ============================================
-output "node_group_id" {
-  description = "Active Node Group ID (private preferred)"
-  value = var.enable_private_node_group ? (
-    aws_eks_node_group.private[0].id
-    ) : (
-    var.enable_public_node_group ? aws_eks_node_group.public[0].id : null
-  )
-}
-
-output "node_group_arn" {
-  description = "Active Node Group ARN"
-  value = var.enable_private_node_group ? (
-    aws_eks_node_group.private[0].arn
-    ) : (
-    var.enable_public_node_group ? aws_eks_node_group.public[0].arn : null
-  )
-}
-
-output "node_group_status" {
-  description = "Active Node Group status"
-  value = var.enable_private_node_group ? (
-    aws_eks_node_group.private[0].status
-    ) : (
-    var.enable_public_node_group ? aws_eks_node_group.public[0].status : null
-  )
-}
-
-# ============================================
-# CloudWatch Logs
-# ============================================
-output "cloudwatch_log_group_name" {
-  description = "Name of CloudWatch Log Group for cluster"
-  value       = aws_cloudwatch_log_group.cluster.name
-}
-
-output "cloudwatch_log_group_arn" {
-  description = "ARN of CloudWatch Log Group"
-  value       = aws_cloudwatch_log_group.cluster.arn
 }

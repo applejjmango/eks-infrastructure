@@ -1,109 +1,141 @@
-# 1. EKS Node IAM Role
-resource "aws_iam_role" "eks_node" {
-  name = "${var.cluster_name}-${var.node_group_name}-node-role"
+# ============================================
+# EKS Node Group Module - Main Configuration
+# ============================================
+# 용도: EKS Cluster에 독립적으로 Node Group을 생성하는 재사용 가능한 모듈
+# 특징: Public/Private 서브넷 지원, Autoscaling, SSM 접근, Cluster Autoscaler 태그
+
+# ============================================
+# IAM Role for EKS Node Group
+# ============================================
+resource "aws_iam_role" "node_group" {
+  name = "${var.name}-${var.node_group_name}-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
       }
-    }]
+    ]
   })
-  tags = var.common_tags
-}
-
-# 2. Attach required policies to the Node Role
-resource "aws_iam_role_policy_attachment" "eks_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.eks_node.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_container_registry" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_node.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_ssm" {
-  count      = var.enable_ssm ? 1 : 0
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-  role       = aws_iam_role.eks_node.name
-}
-
-# 3. Launch Template (for Security Best Practices)
-resource "aws_launch_template" "eks_node" {
-  name_prefix = "${var.cluster_name}-${var.node_group_name}"
-
-  block_device_mappings {
-    device_name = "/dev/xvda"
-    ebs {
-      volume_size = var.disk_size
-      volume_type = "gp3" # Default to gp3
-      encrypted   = true  # (Security) Encrypt EBS volume
-    }
-  }
-
-  # (Security) Force IMDSv2 (Instance Metadata Service v2)
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 2
-  }
-
-  tag_specifications {
-    resource_type = "instance"
-    tags          = var.common_tags
-  }
-  
-  tags = var.common_tags
-}
-
-# 4. EKS Managed Node Group (MNG)
-resource "aws_eks_node_group" "main" {
-  cluster_name    = var.cluster_name
-  node_group_name = var.node_group_name
-  node_role_arn   = aws_iam_role.eks_node.arn
-  subnet_ids      = var.subnet_ids # (Should be Private Subnets)
-  version         = var.cluster_version
-
-  scaling_config {
-    desired_size = var.desired_size
-    max_size     = var.max_size
-    min_size     = var.min_size
-  }
-
-  # (Operations) Rolling update strategy
-  update_config {
-    max_unavailable_percentage = var.max_unavailable_percentage
-  }
-
-  instance_types = var.instance_types
-  capacity_type  = var.capacity_type
-
-  # (Security) Use the Launch Template created above
-  launch_template {
-    id      = aws_launch_template.eks_node.id
-    version = aws_launch_template.eks_node.latest_version
-  }
-
-  labels = var.kubernetes_labels
 
   tags = merge(
     var.common_tags,
     {
-      Name = "${var.cluster_name}-${var.node_group_name}"
+      Name = "${var.name}-${var.node_group_name}-role"
+    }
+  )
+}
+
+# ============================================
+# IAM Role Policy Attachments
+# ============================================
+
+# Required: Worker Node Policy
+resource "aws_iam_role_policy_attachment" "node_AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.node_group.name
+}
+
+# Required: CNI Policy
+resource "aws_iam_role_policy_attachment" "node_AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.node_group.name
+}
+
+# Required: Container Registry Read-Only
+resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.node_group.name
+}
+
+# Optional: SSM Access for debugging
+resource "aws_iam_role_policy_attachment" "node_AmazonSSMManagedInstanceCore" {
+  count      = var.enable_ssm ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = aws_iam_role.node_group.name
+}
+
+# Optional: CloudWatch Agent for Container Insights
+resource "aws_iam_role_policy_attachment" "node_CloudWatchAgentServerPolicy" {
+  count      = var.enable_cloudwatch ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  role       = aws_iam_role.node_group.name
+}
+
+# ============================================
+# EKS Node Group
+# ============================================
+resource "aws_eks_node_group" "main" {
+  cluster_name    = var.cluster_name
+  node_group_name = "${var.name}-${var.node_group_name}"
+  node_role_arn   = aws_iam_role.node_group.arn
+  subnet_ids      = var.subnet_ids
+  version         = var.cluster_version
+
+  # Instance Configuration
+  ami_type       = var.ami_type
+  capacity_type  = var.capacity_type
+  disk_size      = var.disk_size
+  instance_types = var.instance_types
+
+  # Scaling Configuration
+  scaling_config {
+    desired_size = var.desired_size
+    min_size     = var.min_size
+    max_size     = var.max_size
+  }
+
+  # Update Configuration
+  update_config {
+    max_unavailable_percentage = var.max_unavailable_percentage
+  }
+
+  # SSH Access Configuration (Optional)
+  dynamic "remote_access" {
+    for_each = var.ssh_key_name != "" ? [1] : []
+    content {
+      ec2_ssh_key               = var.ssh_key_name
+      source_security_group_ids = var.ssh_source_security_group_ids
+    }
+  }
+
+  # Kubernetes Labels
+  labels = merge(
+    var.kubernetes_labels,
+    {
+      NodeGroup = var.node_group_name
+      Type      = var.node_group_type # public or private
     }
   )
 
-  # (Operations) Allow Cluster Autoscaler to manage 'desired_size'
+  # Tags for Cluster Autoscaler
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.name}-${var.node_group_name}"
+      Type = var.node_group_type
+      # Cluster Autoscaler Discovery Tags
+      "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+      "k8s.io/cluster-autoscaler/enabled"             = "true"
+    }
+  )
+
+  # Dependencies
+  depends_on = [
+    aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.node_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.node_AmazonEC2ContainerRegistryReadOnly,
+  ]
+
+  # Lifecycle
   lifecycle {
+    create_before_destroy = true
+    # Cluster Autoscaler가 desired_size를 관리하므로 변경 무시
     ignore_changes = [scaling_config[0].desired_size]
   }
 }

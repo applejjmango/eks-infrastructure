@@ -51,84 +51,51 @@ output "oidc_provider" {
 }
 
 # ============================================
-# Unified Node Group Outputs
+# Public Node Group Outputs (조건부)
 # ============================================
-output "node_group_id" {
-  description = "EKS Node Group ID"
-  value       = module.eks_cluster.node_group_id
-}
-
-output "node_group_arn" {
-  description = "EKS Node Group ARN"
-  value       = module.eks_cluster.node_group_arn
-}
-
-output "node_group_status" {
-  description = "Status of the EKS node group"
-  value       = module.eks_cluster.node_group_status
-}
-
-# ============================================
-# Node Group Outputs - PUBLIC (commented by default)
-# ============================================
-/*
 output "public_node_group_id" {
   description = "Public Node Group ID"
-  value       = module.eks_cluster.public_node_group_id
+  value       = var.enable_public_node_group ? module.node_group_public[0].node_group_id : null
 }
 
 output "public_node_group_arn" {
   description = "Public Node Group ARN"
-  value       = module.eks_cluster.public_node_group_arn
+  value       = var.enable_public_node_group ? module.node_group_public[0].node_group_arn : null
 }
 
 output "public_node_group_status" {
   description = "Public Node Group status"
-  value       = module.eks_cluster.public_node_group_status
+  value       = var.enable_public_node_group ? module.node_group_public[0].node_group_status : null
 }
 
-output "public_node_group_version" {
-  description = "Public Node Group Kubernetes version"
-  value       = module.eks_cluster.public_node_group_version
+output "public_node_role_arn" {
+  description = "Public Node IAM Role ARN"
+  value       = var.enable_public_node_group ? module.node_group_public[0].node_role_arn : null
 }
-*/
 
 # ============================================
-# Node Group Outputs - PRIVATE (active)
+# Private Node Group Outputs (조건부)
 # ============================================
 output "private_node_group_id" {
   description = "Private Node Group ID"
-  value       = module.eks_cluster.private_node_group_id
+  value       = var.enable_private_node_group ? module.node_group_private[0].node_group_id : null
 }
 
 output "private_node_group_arn" {
   description = "Private Node Group ARN"
-  value       = module.eks_cluster.private_node_group_arn
+  value       = var.enable_private_node_group ? module.node_group_private[0].node_group_arn : null
 }
 
 output "private_node_group_status" {
   description = "Private Node Group status"
-  value       = module.eks_cluster.private_node_group_status
+  value       = var.enable_private_node_group ? module.node_group_private[0].node_group_status : null
 }
 
-output "private_node_group_version" {
-  description = "Private Node Group Kubernetes version"
-  value       = module.eks_cluster.private_node_group_version
+output "private_node_role_arn" {
+  description = "Private Node IAM Role ARN"
+  value       = var.enable_private_node_group ? module.node_group_private[0].node_role_arn : null
 }
 
-
-# ============================================
-# IAM Role Outputs
-# ============================================
-output "cluster_iam_role_arn" {
-  description = "IAM role ARN of the EKS cluster"
-  value       = module.eks_cluster.cluster_iam_role_arn
-}
-
-output "node_group_iam_role_arn" {
-  description = "IAM role ARN of the EKS node group"
-  value       = module.eks_cluster.node_group_iam_role_arn
-}
 
 # ============================================
 # Bastion Host Outputs

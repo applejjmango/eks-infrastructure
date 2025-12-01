@@ -1,41 +1,47 @@
 # ============================================
-# EKS Cluster Module Variables
+# EKS Cluster Module - Variables
 # ============================================
+# 리팩토링: Node Group 변수 모두 제거, Cluster 관련 변수만 유지
 
 # ============================================
-# General
+# General Variables
 # ============================================
 variable "name" {
-  description = "Name prefix for resources"
+  description = "Common name prefix (e.g., 'dev-playdevops')"
   type        = string
 }
 
 variable "cluster_name" {
-  description = "EKS cluster name"
+  description = "EKS Cluster name"
   type        = string
 }
 
 variable "cluster_version" {
-  description = "Kubernetes version"
+  description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.34"
+  default     = "1.31"
+
+  validation {
+    condition     = can(regex("^1\\.(2[7-9]|3[0-9])$", var.cluster_version))
+    error_message = "cluster_version must be a valid Kubernetes version (1.27 or higher)."
+  }
 }
 
 # ============================================
-# Network
+# Network Configuration
 # ============================================
 variable "vpc_id" {
-  description = "VPC ID"
+  description = "VPC ID where the cluster will be created"
   type        = string
 }
 
 variable "public_subnet_ids" {
-  description = "List of public subnet IDs"
+  description = "List of public subnet IDs for the cluster"
   type        = list(string)
 }
 
 variable "private_subnet_ids" {
-  description = "List of private subnet IDs"
+  description = "List of private subnet IDs for the cluster"
   type        = list(string)
 }
 
@@ -43,9 +49,14 @@ variable "private_subnet_ids" {
 # Cluster Configuration
 # ============================================
 variable "cluster_service_ipv4_cidr" {
-  description = "Service IPv4 CIDR for the cluster"
+  description = "Service IPv4 CIDR for the cluster (do not overlap with VPC CIDR)"
   type        = string
   default     = "172.20.0.0/16"
+
+  validation {
+    condition     = can(cidrhost(var.cluster_service_ipv4_cidr, 0))
+    error_message = "cluster_service_ipv4_cidr must be a valid IPv4 CIDR block."
+  }
 }
 
 variable "cluster_endpoint_private_access" {
@@ -61,144 +72,32 @@ variable "cluster_endpoint_public_access" {
 }
 
 variable "cluster_endpoint_public_access_cidrs" {
-  description = "List of CIDR blocks for public access"
+  description = "List of CIDR blocks allowed to access the public API server endpoint"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = ["0.0.0.0/0"] # ⚠️ Production에서는 제한 필요
+
+  validation {
+    condition = alltrue([
+      for cidr in var.cluster_endpoint_public_access_cidrs : can(cidrhost(cidr, 0))
+    ])
+    error_message = "All CIDR blocks must be valid IPv4 CIDR notation."
+  }
 }
 
 # ============================================
-# OIDC Provider
+# OIDC Provider Configuration
 # ============================================
 variable "eks_oidc_root_ca_thumbprint" {
-  description = "Thumbprint of Root CA for EKS OIDC"
+  description = "Thumbprint of Root CA for EKS OIDC (required for IRSA)"
   type        = string
-  default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280"
+  default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" # AWS Global thumbprint
 }
 
 # ============================================
-# Node Group Type Selection (NEW)
-# ============================================
-variable "enable_public_node_group" {
-  description = "Enable Public Node Group (for testing/dev)"
-  type        = bool
-  default     = false
-}
-
-variable "enable_private_node_group" {
-  description = "Enable Private Node Group (recommended for production)"
-  type        = bool
-  default     = true
-}
-
-# ============================================
-# Shared Node Group Configuration 
-# ============================================
-variable "node_group_ami_type" {
-  description = "AMI type for EKS nodes"
-  type        = string
-  default     = "AL2023_x86_64_STANDARD"
-}
-
-variable "node_group_capacity_type" {
-  description = "Capacity type (ON_DEMAND or SPOT)"
-  type        = string
-  default     = "ON_DEMAND"
-}
-
-variable "node_group_disk_size" {
-  description = "Disk size in GiB for worker nodes"
-  type        = number
-  default     = 20
-}
-
-variable "node_group_max_unavailable" {
-  description = "Max unavailable nodes during update"
-  type        = number
-  default     = 1
-}
-
-variable "node_group_keypair" {
-  description = "EC2 Key Pair for SSH access to nodes"
-  type        = string
-}
-
-variable "node_group_subnet_ids" {
-  description = "Subnet IDs for node group (defaults to public_subnet_ids)"
-  type        = list(string)
-  default     = []
-}
-
-# ============================================
-# Public Node Group Configuration 
-# ============================================
-variable "public_node_group_name" {
-  description = "Name of the public node group"
-  type        = string
-  default     = "public-nodes"
-}
-
-variable "public_node_group_desired_size" {
-  description = "Desired number of public nodes"
-  type        = number
-  default     = 1
-}
-
-variable "public_node_group_min_size" {
-  description = "Minimum number of public nodes"
-  type        = number
-  default     = 1
-}
-
-variable "public_node_group_max_size" {
-  description = "Maximum number of public nodes"
-  type        = number
-  default     = 2
-}
-
-variable "public_node_group_instance_types" {
-  description = "Instance types for public node group"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
-# ============================================
-# Private Node Group Configuration 
-# ============================================
-variable "private_node_group_name" {
-  description = "Name of the private node group"
-  type        = string
-  default     = "private-nodes"
-}
-
-variable "private_node_group_desired_size" {
-  description = "Desired number of private nodes"
-  type        = number
-  default     = 1
-}
-
-variable "private_node_group_min_size" {
-  description = "Minimum number of private nodes"
-  type        = number
-  default     = 1
-}
-
-variable "private_node_group_max_size" {
-  description = "Maximum number of private nodes"
-  type        = number
-  default     = 4
-}
-
-variable "private_node_group_instance_types" {
-  description = "Instance types for private node group"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
-# ============================================
-# Logging
+# Logging Configuration
 # ============================================
 variable "cluster_enabled_log_types" {
-  description = "List of control plane logging types"
+  description = "List of control plane logging types to enable"
   type        = list(string)
   default = [
     "api",
@@ -207,19 +106,32 @@ variable "cluster_enabled_log_types" {
     "controllerManager",
     "scheduler"
   ]
+
+  validation {
+    condition = alltrue([
+      for log_type in var.cluster_enabled_log_types :
+      contains(["api", "audit", "authenticator", "controllerManager", "scheduler"], log_type)
+    ])
+    error_message = "cluster_enabled_log_types can only contain: api, audit, authenticator, controllerManager, scheduler."
+  }
 }
 
 variable "cluster_log_retention_in_days" {
   description = "CloudWatch log retention in days"
   type        = number
   default     = 7
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.cluster_log_retention_in_days)
+    error_message = "cluster_log_retention_in_days must be a valid CloudWatch Logs retention period."
+  }
 }
 
 # ============================================
 # Tags
 # ============================================
 variable "tags" {
-  description = "Additional tags"
+  description = "Map of tags to apply to all resources"
   type        = map(string)
   default     = {}
 }
