@@ -35,8 +35,12 @@ locals {
   eks_cluster_name = data.terraform_remote_state.eks.outputs.cluster_name
   vpc_id           = data.terraform_remote_state.network.outputs.vpc_id
 
+  # var.tags에 공백이 포함된 키-값이 있을 경우 처리
+  safe_tags = {
+    for k, v in var.tags : k => replace(v, " ", "-")
+  }
   common_tags = merge(
-    var.tags,
+    local.safe_tags, # 공백이 안전하게 처리된 태그 사용
     {
       Environment = var.environment
       Project     = var.project_name
@@ -77,7 +81,36 @@ module "ebs_csi_driver" {
   tags = local.common_tags
 }
 
+# ============================================
+# AWS Load Balancer Controller (with IRSA)
+# ============================================
+module "aws_load_balancer_controller" {
+  source = "../../../modules/addons/aws-load-balancer-controller"
+  count  = var.enable_alb_controller ? 1 : 0
 
+
+  name             = "${local.name}-alb-controller"
+  eks_cluster_name = local.eks_cluster_name
+  vpc_id           = local.vpc_id
+  aws_region       = var.aws_region
+
+  # OIDC Provider
+  oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
+  oidc_provider     = data.terraform_remote_state.eks.outputs.oidc_provider
+
+  # Helm Chart
+  helm_chart_version = var.alb_controller_chart_version
+
+  # Image Repository: Use ecr_account_id instead of the full path
+  ecr_account_id = split(".", var.alb_controller_image_repository)[0] # Extracting ECR Account ID
+
+
+  # Ingress Class
+  ingress_class_name = var.alb_controller_ingress_class_name
+  is_default_class   = var.alb_controller_is_default
+
+  common_tags = local.common_tags
+}
 
 /*
 # ============================================
@@ -104,26 +137,7 @@ module "external_dns" {
   tags = local.common_tags
 }
 
-# ============================================
-# AWS Load Balancer Controller (with IRSA)
-# ============================================
-module "aws_load_balancer_controller" {
-  source = "../../../modules/addons/aws-load-balancer-controller"
-  count  = var.enable_alb_controller ? 1 : 0
 
-  name             = "${local.name}-alb-controller"
-  eks_cluster_name = local.eks_cluster_name
-  vpc_id           = local.vpc_id
-
-  # OIDC Provider
-  oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
-  oidc_provider     = data.terraform_remote_state.eks.outputs.oidc_provider
-
-  # Helm Chart
-  chart_version = var.alb_controller_chart_version
-
-  tags = local.common_tags
-}
 
 # ============================================
 # Cert Manager (with IRSA)

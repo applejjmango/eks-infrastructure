@@ -1,96 +1,145 @@
-# 1. IRSA IAM Role
-resource "aws_iam_role" "alb_controller" {
-  name = "${var.cluster_name}-alb-controller"
+# ============================================
+# AWS Load Balancer Controller Module
+# ============================================
+# 용도: ALB/NLB를 Kubernetes Ingress/Service와 통합
+# 기능: IAM Policy, IAM Role (IRSA), Helm 설치, IngressClass 생성
 
-  # Trust policy for OIDC Federation
+# ============================================
+# Data Source: LBC IAM Policy (최신 버전)
+# ============================================
+data "http" "lbc_iam_policy" {
+  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json"
+
+  request_headers = {
+    Accept = "application/json"
+  }
+}
+
+# ============================================
+# IAM Policy for AWS Load Balancer Controller
+# ============================================
+resource "aws_iam_policy" "lbc" {
+  name        = "${var.name}-AWSLoadBalancerControllerIAMPolicy"
+  path        = "/"
+  description = "AWS Load Balancer Controller IAM Policy"
+  policy      = data.http.lbc_iam_policy.response_body
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.name}-lbc-iam-policy"
+    }
+  )
+}
+
+# ============================================
+# IAM Role for AWS Load Balancer Controller (IRSA)
+# ============================================
+resource "aws_iam_role" "lbc" {
+  name = "${var.name}-lbc-iam-role"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
-      Principal = {
-        Federated = var.oidc_provider_arn
-      }
-      # (Security) Condition to trust only the specific ServiceAccount
-      Condition = {
-        StringEquals = {
-          "${replace(var.oidc_issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-          "${replace(var.oidc_issuer, "https://", "")}:aud" = "sts.amazonaws.com"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Federated = var.oidc_provider_arn
         }
-      }
-    }]
+        Condition = {
+          StringEquals = {
+            "${var.oidc_provider}:aud" = "sts.amazonaws.com",
+            "${var.oidc_provider}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+          }
+        }
+      },
+    ]
   })
-  tags = var.common_tags
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.name}-lbc-iam-role"
+    }
+  )
 }
 
-# 2. IAM Policy (Referencing the external JSON file)
-resource "aws_iam_policy" "alb_controller" {
-  name   = "${var.cluster_name}-alb-controller-policy"
-  policy = file("${path.module}/iam-policy.json")
-  tags   = var.common_tags
+# Associate IAM Policy to IAM Role
+resource "aws_iam_role_policy_attachment" "lbc" {
+  policy_arn = aws_iam_policy.lbc.arn
+  role       = aws_iam_role.lbc.name
 }
 
-# 3. Attach Policy to Role
-resource "aws_iam_role_policy_attachment" "alb_controller" {
-  role       = aws_iam_role.alb_controller.name
-  policy_arn = aws_iam_policy.alb_controller.arn
+
+# Data Source: EKS Cluster Details
+data "aws_eks_cluster" "cluster" {
+  name = var.eks_cluster_name
 }
 
-# 4. Deploy Helm Chart
-resource "helm_release" "aws_load_balancer_controller" {
+# ============================================
+# Data Source: EKS Cluster Auth
+# ============================================
+data "aws_eks_cluster_auth" "cluster" {
+  name = var.eks_cluster_name
+}
+
+# ============================================
+# Helm Release: AWS Load Balancer Controller
+# ============================================
+resource "helm_release" "lbc" {
+  depends_on = [aws_iam_role_policy_attachment.lbc]
+
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
-  namespace  = "kube-system" # Must be in kube-system
-  version    = var.chart_version
-  wait       = true
+  version    = var.helm_chart_version
+  namespace  = "kube-system"
 
-  set {
-    name  = "clusterName"
-    value = var.cluster_name
-  }
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller" # Must match IRSA condition
-  }
-  # (★★★★★) Inject the IRSA Role ARN into the ServiceAccount annotations
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.alb_controller.arn
-  }
-  set {
-    name  = "region"
-    value = var.aws_region
-  }
-  set {
-    name  = "vpcId"
-    value = var.vpc_id
-  }
+  values = [
+    yamlencode({
+      clusterName  = var.eks_cluster_name
+      vpcId        = var.vpc_id
+      region       = var.aws_region
+      replicaCount = var.replica_count
 
-  depends_on = [
-    aws_iam_role_policy_attachment.alb_controller
+      serviceAccount = {
+        create = true
+        name   = "aws-load-balancer-controller"
+        annotations = {
+          "eks.amazonaws.com/role-arn" = aws_iam_role.lbc.arn
+        }
+      }
+
+      image = {
+        repository = "${var.ecr_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/amazon/aws-load-balancer-controller"
+      }
+    })
   ]
 }
 
-# 5. Create the default IngressClass
-resource "kubernetes_ingress_class_v1" "alb" {
+# ============================================
+# Kubernetes IngressClass (Default)
+# ============================================
+resource "kubernetes_ingress_class_v1" "default" {
+  depends_on = [helm_release.lbc]
+
   metadata {
-    name = "alb"
+    name = var.ingress_class_name
     annotations = {
-      # Make this the default IngressClass
-      "ingressclass.kubernetes.io/is-default-class" = "true"
+      "ingressclass.kubernetes.io/is-default-class" = var.is_default_class ? "true" : "false"
     }
+    labels = merge(
+      var.common_tags,
+      {
+        "app.kubernetes.io/name"       = "aws-load-balancer-controller"
+        "app.kubernetes.io/managed-by" = "Terraform"
+      }
+    )
   }
 
   spec {
     controller = "ingress.k8s.aws/alb"
   }
-
-  depends_on = [
-    helm_release.aws_load_balancer_controller
-  ]
 }

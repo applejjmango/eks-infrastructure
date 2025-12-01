@@ -233,3 +233,15 @@ terraform destroy -auto-approve
 # 3. Verify
 
 aws eks list-addons --cluster-name dev-myapp-eks
+
+1. Ingress 리소스 생성
+   ↓
+2. AWS LB Controller가 Ingress Spec 감지
+   ↓
+3. Service Account의 IAM Role로 AWS API 호출
+   ↓
+4. ALB/NLB, Target Group, Listener Rule 생성
+   ↓
+5. Pod IP를 Target Group에 등록
+   ↓
+6. 트래픽 라우팅 시작

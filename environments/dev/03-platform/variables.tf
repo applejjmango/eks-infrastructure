@@ -29,6 +29,8 @@ variable "development_division" {
   default     = "Infra"
 }
 
+
+
 # ============================================
 # EBS CSI Driver Variables
 # ============================================
@@ -122,6 +124,41 @@ variable "nodeport_port" {
   type        = number
   default     = 31280
 }
+
+
+# ============================================
+# AWS Load Balancer Controller Variables
+# ============================================
+variable "enable_alb_controller" {
+  description = "Enable AWS Load Balancer Controller"
+  type        = bool
+  default     = true
+}
+
+variable "alb_controller_chart_version" {
+  description = "Helm chart version for AWS Load Balancer Controller"
+  type        = string
+  default     = "" # Use latest
+}
+
+variable "alb_controller_image_repository" {
+  description = "Docker image repository for AWS Load Balancer Controller (region-specific)"
+  type        = string
+  default     = "602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon/aws-load-balancer-controller"
+}
+
+variable "alb_controller_ingress_class_name" {
+  description = "Name of the Ingress Class"
+  type        = string
+  default     = "alb"
+}
+
+variable "alb_controller_is_default" {
+  description = "Set AWS Load Balancer Controller Ingress Class as default"
+  type        = bool
+  default     = true
+}
+
 
 # ============================================
 # Tags

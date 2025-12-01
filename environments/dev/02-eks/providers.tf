@@ -21,7 +21,7 @@ provider "kubernetes" {
 }
 
 # ============================================
-# Helm Provider
+# Helm Provider (Kubernetes 설정을 자동으로 사용)
 # ============================================
 provider "helm" {
   kubernetes = {
@@ -30,39 +30,3 @@ provider "helm" {
     token                  = data.aws_eks_cluster_auth.cluster.token
   }
 }
-
-
-/* OLD
-# ============================================
-# AWS Provider
-# ============================================
-provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = local.common_tags
-  }
-}
-
-# ============================================
-# Kubernetes Provider
-# (Only active after EKS cluster is created)
-# ============================================
-provider "kubernetes" {
-  host                   = module.eks_cluster.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks_cluster.cluster_certificate_authority_data)
-
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args = [
-      "eks",
-      "get-token",
-      "--cluster-name",
-      module.eks_cluster.cluster_name,
-      "--region",
-      var.aws_region
-    ]
-  }
-}
-*/
