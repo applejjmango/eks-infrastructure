@@ -79,10 +79,6 @@ output "alb_controller_helm_release_status" {
   value       = var.enable_alb_controller ? module.aws_load_balancer_controller[0].helm_release_status : null
 }
 
-output "alb_controller_ingress_class_name" {
-  description = "Ingress Class name"
-  value       = var.enable_alb_controller ? module.aws_load_balancer_controller[0].ingress_class_name : null
-}
 
 # ============================================
 # Verification Commands

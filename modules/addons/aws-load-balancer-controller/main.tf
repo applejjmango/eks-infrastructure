@@ -115,6 +115,15 @@ resource "helm_release" "lbc" {
       image = {
         repository = "${var.ecr_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/amazon/aws-load-balancer-controller"
       }
+
+      # ▼▼▼ [추가] IngressClass 설정은 여기서 관리합니다 ▼▼▼
+      ingressClassConfig = {
+        default = var.is_default_class # true/false 변수 매핑
+      }
+
+      # 참고: Helm Chart 기본 동작이 create=true이므로 명시 안 해도 되지만,
+      # 확실히 하려면 아래 내용도 확인 (보통 default 값으로 충분)
+      createIngressClassResource = true
     })
   ]
 }
@@ -122,24 +131,24 @@ resource "helm_release" "lbc" {
 # ============================================
 # Kubernetes IngressClass (Default)
 # ============================================
-resource "kubernetes_ingress_class_v1" "default" {
-  depends_on = [helm_release.lbc]
+# resource "kubernetes_ingress_class_v1" "default" {
+#   depends_on = [helm_release.lbc]
 
-  metadata {
-    name = var.ingress_class_name
-    annotations = {
-      "ingressclass.kubernetes.io/is-default-class" = var.is_default_class ? "true" : "false"
-    }
-    labels = merge(
-      var.common_tags,
-      {
-        "app.kubernetes.io/name"       = "aws-load-balancer-controller"
-        "app.kubernetes.io/managed-by" = "Terraform"
-      }
-    )
-  }
+#   metadata {
+#     name = var.ingress_class_name
+#     annotations = {
+#       "ingressclass.kubernetes.io/is-default-class" = var.is_default_class ? "true" : "false"
+#     }
+#     labels = merge(
+#       var.common_tags,
+#       {
+#         "app.kubernetes.io/name"       = "aws-load-balancer-controller"
+#         "app.kubernetes.io/managed-by" = "Terraform"
+#       }
+#     )
+#   }
 
-  spec {
-    controller = "ingress.k8s.aws/alb"
-  }
-}
+#   spec {
+#     controller = "ingress.k8s.aws/alb"
+#   }
+#}

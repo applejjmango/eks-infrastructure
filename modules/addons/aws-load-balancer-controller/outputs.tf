@@ -51,10 +51,7 @@ output "helm_release_metadata" {
 # ============================================
 # IngressClass
 # ============================================
-output "ingress_class_name" {
-  description = "Name of the IngressClass"
-  value       = kubernetes_ingress_class_v1.default.metadata[0].name
-}
+# 
 
 output "is_default_ingress_class" {
   description = "Whether this is the default IngressClass"
