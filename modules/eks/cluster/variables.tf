@@ -76,17 +76,27 @@ variable "eks_oidc_root_ca_thumbprint" {
 }
 
 # ============================================
-# Node Group
+# Node Group Type Selection (NEW)
 # ============================================
-variable "node_group_name" {
-  description = "Name of the EKS node group"
-  type        = string
+variable "enable_public_node_group" {
+  description = "Enable Public Node Group (for testing/dev)"
+  type        = bool
+  default     = false
 }
 
+variable "enable_private_node_group" {
+  description = "Enable Private Node Group (recommended for production)"
+  type        = bool
+  default     = true
+}
+
+# ============================================
+# Shared Node Group Configuration 
+# ============================================
 variable "node_group_ami_type" {
   description = "AMI type for EKS nodes"
   type        = string
-  default     = "AL2_x86_64"
+  default     = "AL2023_x86_64_STANDARD"
 }
 
 variable "node_group_capacity_type" {
@@ -99,30 +109,6 @@ variable "node_group_disk_size" {
   description = "Disk size in GiB for worker nodes"
   type        = number
   default     = 20
-}
-
-variable "node_group_instance_types" {
-  description = "List of instance types"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
-variable "node_group_desired_size" {
-  description = "Desired number of worker nodes"
-  type        = number
-  default     = 2
-}
-
-variable "node_group_min_size" {
-  description = "Minimum number of worker nodes"
-  type        = number
-  default     = 1
-}
-
-variable "node_group_max_size" {
-  description = "Maximum number of worker nodes"
-  type        = number
-  default     = 4
 }
 
 variable "node_group_max_unavailable" {
@@ -140,6 +126,72 @@ variable "node_group_subnet_ids" {
   description = "Subnet IDs for node group (defaults to public_subnet_ids)"
   type        = list(string)
   default     = []
+}
+
+# ============================================
+# Public Node Group Configuration 
+# ============================================
+variable "public_node_group_name" {
+  description = "Name of the public node group"
+  type        = string
+  default     = "public-nodes"
+}
+
+variable "public_node_group_desired_size" {
+  description = "Desired number of public nodes"
+  type        = number
+  default     = 1
+}
+
+variable "public_node_group_min_size" {
+  description = "Minimum number of public nodes"
+  type        = number
+  default     = 1
+}
+
+variable "public_node_group_max_size" {
+  description = "Maximum number of public nodes"
+  type        = number
+  default     = 2
+}
+
+variable "public_node_group_instance_types" {
+  description = "Instance types for public node group"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+# ============================================
+# Private Node Group Configuration 
+# ============================================
+variable "private_node_group_name" {
+  description = "Name of the private node group"
+  type        = string
+  default     = "private-nodes"
+}
+
+variable "private_node_group_desired_size" {
+  description = "Desired number of private nodes"
+  type        = number
+  default     = 1
+}
+
+variable "private_node_group_min_size" {
+  description = "Minimum number of private nodes"
+  type        = number
+  default     = 1
+}
+
+variable "private_node_group_max_size" {
+  description = "Maximum number of private nodes"
+  type        = number
+  default     = 4
+}
+
+variable "private_node_group_instance_types" {
+  description = "Instance types for private node group"
+  type        = list(string)
+  default     = ["t3.medium"]
 }
 
 # ============================================

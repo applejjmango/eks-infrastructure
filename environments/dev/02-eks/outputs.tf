@@ -51,7 +51,7 @@ output "oidc_provider" {
 }
 
 # ============================================
-# Node Group Outputs
+# Unified Node Group Outputs
 # ============================================
 output "node_group_id" {
   description = "EKS Node Group ID"
@@ -67,6 +67,55 @@ output "node_group_status" {
   description = "Status of the EKS node group"
   value       = module.eks_cluster.node_group_status
 }
+
+# ============================================
+# Node Group Outputs - PUBLIC (commented by default)
+# ============================================
+/*
+output "public_node_group_id" {
+  description = "Public Node Group ID"
+  value       = module.eks_cluster.public_node_group_id
+}
+
+output "public_node_group_arn" {
+  description = "Public Node Group ARN"
+  value       = module.eks_cluster.public_node_group_arn
+}
+
+output "public_node_group_status" {
+  description = "Public Node Group status"
+  value       = module.eks_cluster.public_node_group_status
+}
+
+output "public_node_group_version" {
+  description = "Public Node Group Kubernetes version"
+  value       = module.eks_cluster.public_node_group_version
+}
+*/
+
+# ============================================
+# Node Group Outputs - PRIVATE (active)
+# ============================================
+output "private_node_group_id" {
+  description = "Private Node Group ID"
+  value       = module.eks_cluster.private_node_group_id
+}
+
+output "private_node_group_arn" {
+  description = "Private Node Group ARN"
+  value       = module.eks_cluster.private_node_group_arn
+}
+
+output "private_node_group_status" {
+  description = "Private Node Group status"
+  value       = module.eks_cluster.private_node_group_status
+}
+
+output "private_node_group_version" {
+  description = "Private Node Group Kubernetes version"
+  value       = module.eks_cluster.private_node_group_version
+}
+
 
 # ============================================
 # IAM Role Outputs

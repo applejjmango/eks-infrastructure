@@ -61,17 +61,39 @@ module "eks_cluster" {
   # OIDC Provider
   eks_oidc_root_ca_thumbprint = var.eks_oidc_root_ca_thumbprint
 
-  # Node Group
-  node_group_name            = var.node_group_name
+  # ============================================
+  # Node Group Type Selection 
+  # ============================================
+  enable_public_node_group  = var.enable_public_node_group
+  enable_private_node_group = var.enable_private_node_group
+
+  # ============================================
+  # Public Node Group Configuration 
+  # ============================================
+  public_node_group_name           = var.public_node_group_name
+  public_node_group_desired_size   = var.public_node_group_desired_size
+  public_node_group_min_size       = var.public_node_group_min_size
+  public_node_group_max_size       = var.public_node_group_max_size
+  public_node_group_instance_types = var.public_node_group_instance_types
+
+  # ============================================
+  # Private Node Group Configuration 
+  # ============================================
+  private_node_group_name           = var.private_node_group_name
+  private_node_group_desired_size   = var.private_node_group_desired_size
+  private_node_group_min_size       = var.private_node_group_min_size
+  private_node_group_max_size       = var.private_node_group_max_size
+  private_node_group_instance_types = var.private_node_group_instance_types
+
+  # ============================================
+  # Shared Node Group Configuration 
+  # ============================================
   node_group_ami_type        = var.node_group_ami_type
   node_group_capacity_type   = var.node_group_capacity_type
   node_group_disk_size       = var.node_group_disk_size
-  node_group_instance_types  = var.node_group_instance_types
-  node_group_desired_size    = var.node_group_desired_size
-  node_group_min_size        = var.node_group_min_size
-  node_group_max_size        = var.node_group_max_size
   node_group_max_unavailable = var.node_group_max_unavailable
   node_group_keypair         = var.bastion_instance_keypair
+
 
   # Logging
   cluster_enabled_log_types     = var.cluster_enabled_log_types

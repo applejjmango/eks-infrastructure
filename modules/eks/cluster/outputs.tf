@@ -88,26 +88,79 @@ output "node_group_iam_role_arn" {
 }
 
 # ============================================
-# Node Group
+# Node Group Outputs - PUBLIC
+# ============================================
+output "public_node_group_id" {
+  description = "Public Node Group ID"
+  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].id : null
+}
+
+output "public_node_group_arn" {
+  description = "Public Node Group ARN"
+  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].arn : null
+}
+
+output "public_node_group_status" {
+  description = "Public Node Group status"
+  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].status : null
+}
+
+output "public_node_group_version" {
+  description = "Public Node Group Kubernetes version"
+  value       = var.enable_public_node_group ? aws_eks_node_group.public[0].version : null
+}
+
+# ============================================
+# Node Group Outputs - PRIVATE
+# ============================================
+output "private_node_group_id" {
+  description = "Private Node Group ID"
+  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].id : null
+}
+
+output "private_node_group_arn" {
+  description = "Private Node Group ARN"
+  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].arn : null
+}
+
+output "private_node_group_status" {
+  description = "Private Node Group status"
+  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].status : null
+}
+
+output "private_node_group_version" {
+  description = "Private Node Group Kubernetes version"
+  value       = var.enable_private_node_group ? aws_eks_node_group.private[0].version : null
+}
+
+# ============================================
+# Unified Output (Backward Compatibility)
 # ============================================
 output "node_group_id" {
-  description = "EKS node group ID"
-  value       = aws_eks_node_group.main.id
+  description = "Active Node Group ID (private preferred)"
+  value = var.enable_private_node_group ? (
+    aws_eks_node_group.private[0].id
+    ) : (
+    var.enable_public_node_group ? aws_eks_node_group.public[0].id : null
+  )
 }
 
 output "node_group_arn" {
-  description = "Amazon Resource Name (ARN) of the EKS Node Group"
-  value       = aws_eks_node_group.main.arn
+  description = "Active Node Group ARN"
+  value = var.enable_private_node_group ? (
+    aws_eks_node_group.private[0].arn
+    ) : (
+    var.enable_public_node_group ? aws_eks_node_group.public[0].arn : null
+  )
 }
 
 output "node_group_status" {
-  description = "Status of the EKS node group"
-  value       = aws_eks_node_group.main.status
-}
-
-output "node_group_resources" {
-  description = "Resources associated with the node group"
-  value       = aws_eks_node_group.main.resources
+  description = "Active Node Group status"
+  value = var.enable_private_node_group ? (
+    aws_eks_node_group.private[0].status
+    ) : (
+    var.enable_public_node_group ? aws_eks_node_group.public[0].status : null
+  )
 }
 
 # ============================================

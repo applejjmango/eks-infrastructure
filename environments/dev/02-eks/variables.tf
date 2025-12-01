@@ -78,18 +78,28 @@ variable "eks_oidc_root_ca_thumbprint" {
 }
 
 # ============================================
-# Node Group Variables
+# Node Group Type Selection
 # ============================================
-variable "node_group_name" {
-  description = "Name of the EKS node group"
-  type        = string
-  default     = "eks-ng-public"
+variable "enable_public_node_group" {
+  description = "Enable Public Node Group"
+  type        = bool
+  default     = false # 기본적으로 비활성화
 }
+
+variable "enable_private_node_group" {
+  description = "Enable Private Node Group"
+  type        = bool
+  default     = true # 기본적으로 활성화
+}
+
+# ============================================
+# Shared Node Group Variables
+# ============================================
 
 variable "node_group_ami_type" {
   description = "AMI type for EKS nodes"
   type        = string
-  default     = "AL2_x86_64"
+  default     = "AL2023_x86_64_STANDARD"
 }
 
 variable "node_group_capacity_type" {
@@ -104,35 +114,82 @@ variable "node_group_disk_size" {
   default     = 20
 }
 
-variable "node_group_instance_types" {
-  description = "List of instance types for the node group"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
-variable "node_group_desired_size" {
-  description = "Desired number of worker nodes"
-  type        = number
-  default     = 2
-}
-
-variable "node_group_min_size" {
-  description = "Minimum number of worker nodes"
-  type        = number
-  default     = 1
-}
-
-variable "node_group_max_size" {
-  description = "Maximum number of worker nodes"
-  type        = number
-  default     = 4
-}
-
 variable "node_group_max_unavailable" {
   description = "Max unavailable nodes during update"
   type        = number
   default     = 1
 }
+
+# ============================================
+# Public Node Group Variables
+# ============================================
+variable "public_node_group_name" {
+  description = "Public node group name"
+  type        = string
+  default     = "public-nodes"
+}
+
+variable "public_node_group_desired_size" {
+  description = "Public node group desired size"
+  type        = number
+  default     = 1
+}
+
+variable "public_node_group_min_size" {
+  description = "Public node group min size"
+  type        = number
+  default     = 1
+}
+
+variable "public_node_group_max_size" {
+  description = "Public node group max size"
+  type        = number
+  default     = 2
+}
+
+variable "public_node_group_instance_types" {
+  description = "Public node group instance types"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+
+# ============================================
+# Private Node Group Variables
+# ============================================
+variable "private_node_group_name" {
+  description = "Private node group name"
+  type        = string
+  default     = "private-nodes"
+}
+
+variable "private_node_group_desired_size" {
+  description = "Private node group desired size"
+  type        = number
+  default     = 1
+}
+
+variable "private_node_group_min_size" {
+  description = "Private node group min size"
+  type        = number
+  default     = 1
+}
+
+variable "private_node_group_max_size" {
+  description = "Private node group max size"
+  type        = number
+  default     = 2
+}
+
+variable "private_node_group_instance_types" {
+  description = "Private node group instance types"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+
+
+
 
 # ============================================
 # Bastion Host Variables
