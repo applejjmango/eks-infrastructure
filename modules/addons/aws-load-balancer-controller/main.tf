@@ -89,7 +89,7 @@ data "aws_eks_cluster_auth" "cluster" {
 # Helm Release: AWS Load Balancer Controller
 # ============================================
 resource "helm_release" "lbc" {
-  depends_on = [aws_iam_role_policy_attachment.lbc]
+  depends_on = [aws_iam_role.lbc]
 
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
