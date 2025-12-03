@@ -75,6 +75,7 @@ variable "cluster_endpoint_public_access_cidrs" {
   description = "List of CIDR blocks allowed to access the public API server endpoint"
   type        = list(string)
   default     = ["0.0.0.0/0"] # ⚠️ Production에서는 제한 필요
+  # default     = []  # ✅ 기본값 비움 (Private access만 사용)
 
   validation {
     condition = alltrue([
@@ -87,11 +88,11 @@ variable "cluster_endpoint_public_access_cidrs" {
 # ============================================
 # OIDC Provider Configuration
 # ============================================
-variable "eks_oidc_root_ca_thumbprint" {
-  description = "Thumbprint of Root CA for EKS OIDC (required for IRSA)"
-  type        = string
-  default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" # AWS Global thumbprint
-}
+# variable "eks_oidc_root_ca_thumbprint" {
+#   description = "Thumbprint of Root CA for EKS OIDC (required for IRSA)"
+#   type        = string
+#   default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" # AWS Global thumbprint
+# }
 
 # ============================================
 # Logging Configuration

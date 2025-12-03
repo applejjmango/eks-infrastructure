@@ -62,8 +62,8 @@ module "eks_cluster" {
   cluster_endpoint_public_access       = var.cluster_endpoint_public_access
   cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
-  # OIDC Provider
-  eks_oidc_root_ca_thumbprint = var.eks_oidc_root_ca_thumbprint
+  # OIDC Provider [To be Deleted]
+  # eks_oidc_root_ca_thumbprint = var.eks_oidc_root_ca_thumbprint
 
   # Logging
   cluster_enabled_log_types     = var.cluster_enabled_log_types
@@ -184,7 +184,7 @@ module "bastion" {
   count  = var.enable_bastion ? 1 : 0
 
   # General
-  name = local.name
+  name = "${local.name}-bastion"
 
   # Network
   vpc_id           = local.vpc_id

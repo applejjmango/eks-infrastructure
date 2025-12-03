@@ -72,11 +72,11 @@ variable "cluster_endpoint_public_access_cidrs" {
 # ============================================
 # OIDC Provider Variables
 # ============================================
-variable "eks_oidc_root_ca_thumbprint" {
-  description = "Thumbprint of Root CA for EKS OIDC"
-  type        = string
-  default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280"
-}
+# variable "eks_oidc_root_ca_thumbprint" { [To be Deleted]
+#   description = "Thumbprint of Root CA for EKS OIDC"
+#   type        = string
+#   default     = "9e99a48a9960b14926bb7f3b02e22da2b0ab7280"
+# }
 
 # ============================================
 # Node Group Type Selection

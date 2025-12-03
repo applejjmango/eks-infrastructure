@@ -80,7 +80,6 @@ variable "pvc_storage_size" {
 variable "mysql_root_password" {
   description = "MySQL root password"
   type        = string
-  default     = "dbpassword11"
   sensitive   = true
 }
 

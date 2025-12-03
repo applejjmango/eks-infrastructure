@@ -64,7 +64,7 @@ variable "min_size" {
 variable "max_size" {
   description = "Maximum number of nodes"
   type        = number
-  default     = 10
+  default     = 5
 
   validation {
     condition     = var.max_size >= var.min_size

@@ -126,7 +126,7 @@ data "tls_certificate" "cluster" {
 
 resource "aws_iam_openid_connect_provider" "cluster" {
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [var.eks_oidc_root_ca_thumbprint]
+  thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
   url             = aws_eks_cluster.cluster.identity[0].oidc[0].issuer
 
   tags = merge(
