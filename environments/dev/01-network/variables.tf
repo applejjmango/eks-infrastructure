@@ -67,7 +67,7 @@ variable "enable_nat_gateway" {
 variable "single_nat_gateway" {
   description = "Use single NAT Gateway for all AZs"
   type        = bool
-  default     = false
+  default     = true # [PROD] false 수정 (us-east-1에서 AZ 3개를 쓰면 NAT Gateway도 3개가 생기지.)
 }
 
 variable "one_nat_gateway_per_az" {
