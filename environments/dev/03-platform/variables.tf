@@ -23,10 +23,11 @@ variable "project_name" {
   default     = "playdevops"
 }
 
-variable "development_division" {
-  description = "Development Division"
+
+variable "division" {
+  description = "Organizational or technical division responsible for this infrastructure"
   type        = string
-  default     = "Infra"
+  default     = "CloudInfra"
 }
 
 

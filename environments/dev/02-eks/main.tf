@@ -26,11 +26,11 @@ locals {
   common_tags = merge(
     var.tags,
     {
-      Environment      = var.environment
-      Project          = var.project_name
-      BusinessDivision = var.development_division
-      ManagedBy        = "Terraform"
-      Layer            = "eks"
+      Environment = var.environment
+      Project     = var.project_name
+      division    = var.division
+      ManagedBy   = "Terraform"
+      Layer       = "eks"
     }
   )
 

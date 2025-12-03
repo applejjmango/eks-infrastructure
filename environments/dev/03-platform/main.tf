@@ -75,9 +75,6 @@ module "ebs_csi_driver" {
   service_account_name = "ebs-csi-controller-sa"
   namespace            = "kube-system"
 
-  # Helm Chart (only when run by HELM)
-  #chart_version = var.ebs_csi_driver_chart_version
-
   tags = local.common_tags
 }
 

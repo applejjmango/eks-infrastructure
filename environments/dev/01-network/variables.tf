@@ -16,11 +16,12 @@ variable "environment" {
   type        = string
 }
 
-variable "development_division" {
-  description = "INFRA Division"
+variable "division" {
+  description = "Organizational or technical division responsible for this infrastructure"
   type        = string
-  default     = "INFRA"
+  default     = "CloudInfra"
 }
+
 
 # ============================================
 # VPC Variables
