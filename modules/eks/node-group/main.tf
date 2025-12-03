@@ -70,7 +70,7 @@ resource "aws_iam_role_policy_attachment" "node_CloudWatchAgentServerPolicy" {
 # ============================================
 # EKS Node Group
 # ============================================
-resource "aws_eks_node_group" "main" {
+resource "aws_eks_node_group" "this" {
   cluster_name    = var.cluster_name
   node_group_name = "${var.name}-${var.node_group_name}"
   node_role_arn   = aws_iam_role.node_group.arn

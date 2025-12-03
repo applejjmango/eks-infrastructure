@@ -5,17 +5,17 @@
 # VPC
 output "vpc_id" {
   description = "VPC ID"
-  value       = aws_vpc.main.id
+  value       = aws_vpc.this.id
 }
 
 output "vpc_cidr" {
   description = "VPC CIDR block"
-  value       = aws_vpc.main.cidr_block
+  value       = aws_vpc.this.cidr_block
 }
 
 output "vpc_arn" {
   description = "VPC ARN"
-  value       = aws_vpc.main.arn
+  value       = aws_vpc.this.arn
 }
 
 # Subnets
@@ -58,7 +58,7 @@ output "private_route_table_ids" {
 # NAT Gateways
 output "nat_gateway_ids" {
   description = "NAT Gateway IDs"
-  value       = aws_nat_gateway.main[*].id
+  value       = aws_nat_gateway.this[*].id
 }
 
 output "nat_gateway_public_ips" {
@@ -69,7 +69,7 @@ output "nat_gateway_public_ips" {
 # Internet Gateway
 output "internet_gateway_id" {
   description = "Internet Gateway ID"
-  value       = aws_internet_gateway.main.id
+  value       = aws_internet_gateway.this.id
 }
 
 # Availability Zones

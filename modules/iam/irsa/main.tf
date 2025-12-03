@@ -6,7 +6,7 @@
 # ============================================
 # IAM Policy Document
 # ============================================
-data "aws_iam_policy_document" "this" {
+data "aws_iam_policy_document" "irsa_policy_doc" {
   dynamic "statement" {
     for_each = var.iam_policy_statements
 
@@ -21,11 +21,11 @@ data "aws_iam_policy_document" "this" {
 # ============================================
 # IAM Policy
 # ============================================
-resource "aws_iam_policy" "this" {
+resource "aws_iam_policy" "irsa_policy" {
   name        = "${var.name}-policy"
   path        = "/"
   description = "IAM Policy for ${var.name}"
-  policy      = data.aws_iam_policy_document.this.json
+  policy      = data.aws_iam_policy_document.irsa_policy_doc.json
 
   tags = merge(
     var.tags,
@@ -38,7 +38,7 @@ resource "aws_iam_policy" "this" {
 # ============================================
 # IAM Role for IRSA
 # ============================================
-resource "aws_iam_role" "this" {
+resource "aws_iam_role" "irsa_role" {
   name = "${var.name}-role"
 
   assume_role_policy = jsonencode({
@@ -71,15 +71,15 @@ resource "aws_iam_role" "this" {
 # ============================================
 # Attach Policy to Role
 # ============================================
-resource "aws_iam_role_policy_attachment" "this" {
-  policy_arn = aws_iam_policy.this.arn
-  role       = aws_iam_role.this.name
+resource "aws_iam_role_policy_attachment" "irsa_policy_attach" {
+  policy_arn = aws_iam_policy.irsa_policy.arn
+  role       = aws_iam_role.irsa_role.name
 }
 
 # ============================================
 # Kubernetes Service Account (Optional)
 # ============================================
-resource "kubernetes_service_account_v1" "this" {
+resource "kubernetes_service_account_v1" "service_account" {
   count = var.create_service_account ? 1 : 0
 
   metadata {
@@ -87,7 +87,7 @@ resource "kubernetes_service_account_v1" "this" {
     namespace = var.namespace
 
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.this.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.irsa_role.arn
     }
   }
 }
