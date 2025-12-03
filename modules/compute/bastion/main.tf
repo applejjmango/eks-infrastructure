@@ -123,27 +123,3 @@ resource "aws_eip" "bastion" {
 
   depends_on = [aws_instance.bastion]
 }
-
-# ============================================
-# Null Resource: Copy Private Key (Optional)
-# ============================================
-resource "null_resource" "copy_key" {
-  # count = var.enable_provisioners && var.private_key_path != "" ? 1 : 0
-
-  depends_on = [aws_instance.bastion, aws_eip.bastion]
-
-  connection {
-    type        = "ssh"
-    host        = aws_eip.bastion.public_ip
-    user        = "ec2-user"
-    private_key = file(var.private_key_path)
-    timeout     = "5m"
-  }
-
-  # Local exec for logging
-  provisioner "local-exec" {
-    command     = "echo 'Bastion Host created at ${aws_eip.bastion.public_ip} on ${timestamp()}' >> bastion-creation.log"
-    working_dir = "local-exec-output-files"
-    on_failure  = continue
-  }
-}
