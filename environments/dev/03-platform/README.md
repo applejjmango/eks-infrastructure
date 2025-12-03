@@ -33,7 +33,7 @@ aws eks list-addons --cluster-name $(terraform output -raw cluster_name)
 
 # ============================================
 
-cd eks-infrastructure/environments/dev/03-addons
+cd eks-infrastructure/environments/dev/03-platform
 
 # Initialize
 
@@ -227,7 +227,7 @@ kubectl delete pvc test-ebs-pvc
 
 # 2. Terraform Destroy
 
-cd environments/dev/03-addons
+cd environments/dev/03-platform
 terraform destroy -auto-approve
 
 # 3. Verify

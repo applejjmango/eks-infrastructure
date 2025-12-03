@@ -1,50 +1,266 @@
-#!/bin/bash
-# Destruction script for EKS infrastructure
+#!/usr/bin/env bash
+# =============================================================================
+# destroy.sh - EKS Infrastructure 삭제 스크립트
+# =============================================================================
+# 실행 순서: 04-workloads/app-tier → 03-platform → 02-eks → 01-network (역순!)
+# 사용법: ./scripts/destroy.sh [환경] [옵션]
+# =============================================================================
 
-set -e
+set -euo pipefail
 
-ENVIRONMENT="${1:-dev}"
-COMPONENT="${2:-all}"
+# =============================================================================
+# 설정
+# =============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-if [ -z "$ENVIRONMENT" ]; then
-  echo "Usage: $0 <environment> [component]"
-  echo "Components: network, eks, addons, applications, all"
-  exit 1
-fi
+# 색상 정의
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-cd "$(dirname "$0")/../environments/$ENVIRONMENT"
+# 기본값
+DEFAULT_ENV="dev"
+SKIP_CONFIRM=false
+TARGET_LAYER=""
 
-case "$COMPONENT" in
-  network)
-    cd 01-network
-    terraform destroy
-    ;;
-  eks)
-    cd 02-eks
-    terraform destroy
-    ;;
-  addons)
-    cd 03-addons
-    terraform destroy
-    ;;
-  applications)
-    cd 04-applications
-    terraform destroy
-    ;;
-  all)
-    # Destroy in reverse order
-    for dir in 04-applications 03-addons 02-eks 01-network; do
-      echo "Destroying $dir..."
-      cd "$dir"
-      terraform destroy
-      cd ..
+# 레이어 정의 (삭제는 역순!)
+declare -a LAYERS_REVERSE=(
+    "04-workloads/app-tier"
+    "03-platform"
+    "02-eks"
+    "01-network"
+)
+
+# =============================================================================
+# 유틸리티 함수
+# =============================================================================
+log_info()    { echo -e "${BLUE}[INFO]${NC} $(date '+%H:%M:%S') $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $(date '+%H:%M:%S') $1"; }
+log_warn()    { echo -e "${YELLOW}[WARN]${NC} $(date '+%H:%M:%S') $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $(date '+%H:%M:%S') $1" >&2; }
+
+log_step() {
+    echo -e "\n${RED}${BOLD}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${RED}${BOLD}  🗑️  $1${NC}"
+    echo -e "${RED}${BOLD}═══════════════════════════════════════════════════════════${NC}\n"
+}
+
+print_banner() {
+    echo -e "${RED}"
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    echo "║                                                               ║"
+    echo "║          EKS Infrastructure - DESTROY (삭제)                  ║"
+    echo "║                                                               ║"
+    echo "║    순서: 04-workloads → 03-platform → 02-eks → 01-network    ║"
+    echo "║                                                               ║"
+    echo "║    ⚠️  경고: 이 작업은 되돌릴 수 없습니다!                     ║"
+    echo "║                                                               ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+usage() {
+    cat << EOF
+${BOLD}사용법:${NC}
+    $(basename "$0") [environment] [options]
+
+${BOLD}Environment:${NC}
+    dev         개발 환경 (기본값)
+    staging     스테이징 환경
+    prod        프로덕션 환경
+
+${BOLD}Options:${NC}
+    -l, --layer LAYER    특정 레이어만 삭제
+    -y, --yes            확인 프롬프트 건너뛰기 (위험!)
+    -h, --help           도움말
+
+${BOLD}Examples:${NC}
+    $(basename "$0")                     # dev 환경 전체 삭제
+    $(basename "$0") prod                # prod 환경 전체 삭제
+    $(basename "$0") dev -l 03-platform  # dev의 03-platform만 삭제
+    $(basename "$0") dev -y              # 확인 없이 삭제 (CI/CD용)
+
+${BOLD}⚠️  주의:${NC}
+    - 삭제는 역순으로 진행됩니다 (의존성 고려)
+    - prod 환경 삭제 시 환경 이름을 직접 입력해야 합니다
+
+EOF
+}
+
+# =============================================================================
+# 인자 파싱
+# =============================================================================
+parse_args() {
+    # 환경 설정
+    if [[ $# -gt 0 && ! "$1" =~ ^- ]]; then
+        ENVIRONMENT="$1"
+        shift
+    else
+        ENVIRONMENT="${DEFAULT_ENV}"
+    fi
+
+    # 옵션 파싱
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -l|--layer)
+                TARGET_LAYER="$2"
+                shift 2
+                ;;
+            -y|--yes)
+                SKIP_CONFIRM=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                log_error "알 수 없는 옵션: $1"
+                usage
+                exit 1
+                ;;
+        esac
     done
-    ;;
-  *)
-    echo "Unknown component: $COMPONENT"
-    exit 1
-    ;;
-esac
 
-echo "Destruction completed successfully!"
+    # 환경 디렉토리 검증
+    ENV_DIR="${PROJECT_ROOT}/environments/${ENVIRONMENT}"
+    if [[ ! -d "${ENV_DIR}" ]]; then
+        log_error "환경 디렉토리가 없습니다: ${ENV_DIR}"
+        exit 1
+    fi
+}
 
+# =============================================================================
+# Terraform 삭제 실행
+# =============================================================================
+run_terraform_destroy() {
+    local layer_path="$1"
+    local layer_name=$(basename "${layer_path}")
+
+    log_step "Layer: ${layer_name} 삭제 중..."
+
+    cd "${layer_path}"
+
+    # State 확인
+    if [[ ! -d ".terraform" ]]; then
+        log_warn "${layer_name}: 초기화되지 않음 (건너뜀)"
+        return 0
+    fi
+
+    # Init (state 접근을 위해 필요)
+    log_info "terraform init -input=false"
+    terraform init -input=false
+
+    # 리소스 존재 여부 확인
+    local resource_count=$(terraform state list 2>/dev/null | wc -l || echo "0")
+    if [[ "${resource_count}" -eq 0 ]]; then
+        log_warn "${layer_name}: 삭제할 리소스 없음 (건너뜀)"
+        return 0
+    fi
+
+    log_info "삭제 대상: ${resource_count}개 리소스"
+
+    # Destroy
+    log_info "terraform destroy -auto-approve"
+    terraform destroy -auto-approve
+
+    log_success "✅ ${layer_name} 삭제 완료!"
+}
+
+# =============================================================================
+# 확인 프롬프트 (삭제는 더 엄격하게!)
+# =============================================================================
+confirm_destroy() {
+    if [[ "${SKIP_CONFIRM}" == true ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "${RED}${BOLD}⚠️  경고: 이 작업은 인프라를 삭제합니다!${NC}"
+    echo ""
+    echo -e "${YELLOW}📋 삭제 정보:${NC}"
+    echo -e "   환경: ${BOLD}${ENVIRONMENT}${NC}"
+    
+    if [[ -n "${TARGET_LAYER}" ]]; then
+        echo -e "   대상: ${BOLD}${TARGET_LAYER}${NC}"
+    else
+        echo -e "   대상: ${BOLD}전체 레이어${NC}"
+        echo ""
+        echo -e "${YELLOW}📦 삭제 순서 (역순):${NC}"
+        local i=1
+        for layer in "${LAYERS_REVERSE[@]}"; do
+            echo -e "   ${i}. ${layer}"
+            ((i++))
+        done
+    fi
+
+    echo ""
+    
+    # prod 환경은 추가 확인
+    if [[ "${ENVIRONMENT}" == "prod" ]]; then
+        echo -e "${RED}${BOLD}🚨 프로덕션 환경입니다! 매우 신중하게 진행하세요.${NC}"
+        echo ""
+        read -p "환경 이름을 정확히 입력하세요 [${ENVIRONMENT}]: " confirm_env
+        if [[ "${confirm_env}" != "${ENVIRONMENT}" ]]; then
+            log_error "환경 이름이 일치하지 않습니다. 삭제를 취소합니다."
+            exit 1
+        fi
+    fi
+
+    read -p "정말로 삭제하시겠습니까? [yes/NO]: " confirm
+    if [[ "${confirm}" != "yes" ]]; then
+        log_info "삭제가 취소되었습니다."
+        exit 0
+    fi
+}
+
+# =============================================================================
+# 메인 실행
+# =============================================================================
+main() {
+    print_banner
+    parse_args "$@"
+
+    confirm_destroy
+
+    local start_time=$(date +%s)
+    local env_dir="${PROJECT_ROOT}/environments/${ENVIRONMENT}"
+
+    # 실행할 레이어 결정
+    if [[ -n "${TARGET_LAYER}" ]]; then
+        local layer_path="${env_dir}/${TARGET_LAYER}"
+        if [[ ! -d "${layer_path}" ]]; then
+            log_error "레이어가 없습니다: ${TARGET_LAYER}"
+            exit 1
+        fi
+        run_terraform_destroy "${layer_path}"
+    else
+        # 전체 레이어 역순 실행
+        for layer in "${LAYERS_REVERSE[@]}"; do
+            local layer_path="${env_dir}/${layer}"
+            if [[ -d "${layer_path}" ]]; then
+                run_terraform_destroy "${layer_path}"
+            else
+                log_warn "레이어 디렉토리 없음 (건너뜀): ${layer}"
+            fi
+        done
+    fi
+
+    # 완료 메시지
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local minutes=$((duration / 60))
+    local seconds=$((duration % 60))
+
+    echo ""
+    log_step "🗑️ 삭제 완료!"
+    log_success "환경: ${ENVIRONMENT}"
+    log_success "소요 시간: ${minutes}분 ${seconds}초"
+}
+
+main "$@"

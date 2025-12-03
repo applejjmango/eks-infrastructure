@@ -30,22 +30,20 @@ data "terraform_remote_state" "network" {
 # ============================================
 # Local Values
 # ============================================
+# environments/dev/03-platform/main.tf (라인 32-46)
 locals {
   name             = "${var.environment}-${var.project_name}"
   eks_cluster_name = data.terraform_remote_state.eks.outputs.cluster_name
   vpc_id           = data.terraform_remote_state.network.outputs.vpc_id
 
-  # var.tags에 공백이 포함된 키-값이 있을 경우 처리
-  safe_tags = {
-    for k, v in var.tags : k => replace(v, " ", "-")
-  }
+  # 태그 정규화: 공백을 하이픈으로 변환 후 기본 태그와 병합
   common_tags = merge(
-    local.safe_tags, # 공백이 안전하게 처리된 태그 사용
+    { for key, value in var.tags : key => replace(value, " ", "-") },
     {
       Environment = var.environment
       Project     = var.project_name
       ManagedBy   = "Terraform"
-      Layer       = "addons"
+      Layer       = "platform"
     }
   )
 }
