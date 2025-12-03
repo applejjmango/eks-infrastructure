@@ -16,12 +16,12 @@ data "terraform_remote_state" "eks" {
 # ============================================
 # Remote State: Network Layer
 # ============================================
-data "terraform_remote_state" "network" {
+data "terraform_remote_state" "platform" {
   backend = "s3"
 
   config = {
     bucket = "plydevops-infra-tf-dev"
-    key    = "dev/01-network/terraform.tfstate"
+    key    = "dev/03-platform/terraform.tfstate"
     region = var.aws_region
   }
 }
@@ -31,157 +31,157 @@ data "terraform_remote_state" "network" {
 # Local Values
 # ============================================
 locals {
-  name             = "${var.environment}-${var.project_name}"
-  eks_cluster_name = data.terraform_remote_state.eks.outputs.cluster_name
-  vpc_id           = data.terraform_remote_state.network.outputs.vpc_id
+  # Platform Remote State에서 IngressClass 이름 가져오기
+  ingress_class_name = data.terraform_remote_state.platform.outputs.ingress_class_name
 
-  common_tags = merge(
-    var.tags,
-    {
-      Environment = var.environment
-      Project     = var.project_name
-      ManagedBy   = "Terraform"
-      Layer       = "addons"
-    }
-  )
+  # 외부 노출 앱만 필터링 (Ingress에 포함)
+  external_apps = [for app in var.apps : app if app.expose_external]
+
+  # 모든 앱 (Deployment + Service는 모두 생성)
+  all_apps = { for app in var.apps : app.name => app }
 }
 
-# ===== playdevops WebApp 배포 =====
-# 실무: modules/kubernetes/app/ 모듈 사용
-module "playdevops" {
-  source = "../../../../modules/kubernetes/app"
+# =============================================================================
+# App Tier - Main
+# =============================================================================
+# 실무 관점: 앱 배포 + Ingress를 하나의 티어에서 관리
+#
+# 구조:
+#   1. App 모듈: 각 앱의 Deployment + Service 생성
+#   2. Ingress 모듈: ACM + ALB Ingress 생성 (외부 노출 앱만)
+#
+# 장점:
+#   - 한 번의 terraform apply로 앱 + Ingress 배포
+#   - 관련 리소스가 한 곳에서 관리
+#   - 원자적 배포/롤백 가능
+# =============================================================================
+module "apps" {
+  source   = "../../../../modules/kubernetes/app"
+  for_each = local.all_apps
 
-  # ===== 기본 설정 =====
-  project_name = var.project_name
-  namespace    = var.namespace
-  environment  = "dev"
+  # -----------------------------
+  # 기본 설정
+  # -----------------------------
+  app_name        = each.value.name
+  environment     = var.environment
+  namespace       = var.namespace
+  container_image = each.value.image
+  replicas        = each.value.replicas
+  container_port  = each.value.container_port
 
-  # 실무: dev 환경은 default 네임스페이스 사용 가능
-  # prod 환경은 별도 네임스페이스 권장
-  create_namespace = var.create_namespace
+  # -----------------------------
+  # Health Check
+  # -----------------------------
+  health_check_path = each.value.health_check_path
 
-  namespace_labels = {
-    "team"        = "backend"
-    "application" = "playdevops"
-    "tier"        = "app"
-  }
-
-  # ===== 컨테이너 이미지 =====
-  # 실무: ECR 사용 권장, latest 태그 절대 금지
-  # 기존 코드: stacksimplify/kubenginx:1.0.0
-  image_repository  = var.image_repository
-  image_tag         = var.image_tag
-  image_pull_policy = "IfNotPresent"
-  app_version       = var.app_version
-
-  # 실무: Private Registry (ECR) 사용 시
-  # image_pull_secrets = ["ecr-registry-secret"]
-
-  # ===== Deployment 설정 =====
-  # 실무: dev=1, staging=2, prod=3+
-  replicas = var.replicas
-
-  # 실무: 롤링 업데이트 전략
-  max_surge       = "1" # 동시 1개 추가 생성
-  max_unavailable = "0" # 무중단 배포
-
-  # 실무: 우아한 종료 (진행 중인 요청 완료)
-  termination_grace_period_seconds = 30
-
-  # ===== 컨테이너 리소스 =====
-  # 실무: 모니터링 데이터 기반으로 조정
-  container_port = var.container_port
-  cpu_request    = var.cpu_request
-  memory_request = var.memory_request
-  cpu_limit      = var.cpu_limit
-  memory_limit   = var.memory_limit
-
-  # ===== Health Check (실무 필수) =====
-  # Liveness: 애플리케이션이 살아있는지 확인
-  enable_liveness_probe            = true
-  liveness_probe_path              = var.liveness_probe_path
-  liveness_probe_initial_delay     = var.liveness_probe_initial_delay
-  liveness_probe_period            = 10
-  liveness_probe_timeout           = 5
-  liveness_probe_failure_threshold = 3
-
-  # Readiness: 트래픽 받을 준비가 되었는지 확인
-  enable_readiness_probe            = true
-  readiness_probe_path              = var.readiness_probe_path
-  readiness_probe_initial_delay     = var.readiness_probe_initial_delay
-  readiness_probe_period            = 5
-  readiness_probe_timeout           = 3
-  readiness_probe_failure_threshold = 3
-
-  # ===== 환경 변수 =====
-  # 실무: 민감하지 않은 설정만 여기에
-  # 민감 정보는 Kubernetes Secret 또는 AWS Secrets Manager 사용
-  environment_variables = merge(
-    var.environment_variables,
-    {
-      # 실무: 환경별 자동 주입
-      "APP_ENV"   = "dev"
-      "LOG_LEVEL" = "debug"
-      "TZ"        = "Asia/Seoul"
-    }
-  )
-
-  # ===== ConfigMap =====
-  # 실무: 설정 파일 외부화 (재배포 없이 변경 가능)
-  config_map_data = var.config_map_data
-
-  # ===== 보안 설정 (실무 권장) =====
-  # 왜: 최소 권한 원칙, 컨테이너 보안 강화
-  run_as_non_root           = true
-  run_as_user               = 1000
-  read_only_root_filesystem = false # nginx는 로컬 쓰기 필요
-
-  # ===== 영구 스토리지 =====
-  # 실무: 파일 업로드, 로그 저장 등
-  # EBS CSI Driver gp3 사용 (gp2보다 30% 저렴)
-  enable_persistent_storage = var.enable_persistent_storage
-  pvc_storage_size          = var.pvc_storage_size
-  storage_class_name        = "gp3"
-  volume_mount_path         = var.volume_mount_path
-  pvc_access_modes          = ["ReadWriteOnce"]
-  volume_read_only          = false
-  prevent_pvc_destroy       = false # dev: false, prod: true
-
-  # ===== Service 설정 =====
+  # -----------------------------
+  # Service 설정
+  # 실무: 외부 노출 앱은 NodePort, 내부용은 ClusterIP
+  # -----------------------------
   create_service = true
-  service_type   = var.service_type
-  service_port   = var.service_port
+  service_type   = each.value.expose_external ? "NodePort" : "ClusterIP"
+  service_port   = 80
 
-  # 실무: LoadBalancer 타입 시 NLB 설정
-  service_annotations = var.service_type == "LoadBalancer" ? {
-    # 실무: NLB 사용 (ALB보다 간단하고 빠름)
-    "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-
-    # 실무: 외부 노출 (internet-facing) 또는 내부 (internal)
-    "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
-
-    # 실무: Cross-Zone 로드밸런싱 활성화
-    "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled" = "true"
-
-    # 실무: 서브넷 지정 (선택적)
-    # "service.beta.kubernetes.io/aws-load-balancer-subnets" = "subnet-xxx,subnet-yyy"
+  # ALB Ingress Controller용 헬스체크 경로
+  service_annotations = each.value.expose_external ? {
+    "alb.ingress.kubernetes.io/healthcheck-path" = each.value.health_check_path
   } : {}
 
-  # 실무: 외부 트래픽 정책
-  # Local: 소스 IP 보존, 노드 로컬 Pod만 사용
-  # Cluster: 전체 Pod 사용 (기본값)
-  external_traffic_policy = var.service_type == "LoadBalancer" ? "Cluster" : "Cluster"
-
-  # ===== 노드 선택 (선택적) =====
-  # 실무: 특정 노드 그룹에 배포
-  node_selector = var.node_selector
-
-  # ===== Pod 어노테이션 =====
-  pod_annotations = {
-    "prometheus.io/scrape" = "true"
-    "prometheus.io/port"   = tostring(var.container_port)
-    "prometheus.io/path"   = "/metrics"
+  # -----------------------------
+  # 리소스 제한
+  # -----------------------------
+  resources = each.value.resources != null ? {
+    requests = {
+      cpu    = each.value.resources.requests_cpu
+      memory = each.value.resources.requests_memory
+    }
+    limits = {
+      cpu    = each.value.resources.limits_cpu
+      memory = each.value.resources.limits_memory
+    }
+    } : {
+    requests = {
+      cpu    = "100m"
+      memory = "128Mi"
+    }
+    limits = {
+      cpu    = "200m"
+      memory = "256Mi"
+    }
   }
+
+  # 레이블
+  labels = merge(var.tags, {
+    app-tier = each.value.expose_external ? "external" : "internal"
+  })
 }
 
+# =============================================================================
+# ALB SSL Ingress 모듈 호출 (조건부)
+# =============================================================================
+# 실무: enable_ingress가 true이고, 외부 노출 앱이 있을 때만 생성
+
+module "alb_ssl_ingress" {
+  source = "../../../../modules/kubernetes/ingress/alb-ssl"
+  count  = var.enable_ingress && length(local.external_apps) > 0 ? 1 : 0
+
+  # -----------------------------
+  # 기본 설정
+  # -----------------------------
+  environment  = var.environment
+  project_name = var.project_name
+  namespace    = var.namespace
+
+  # -----------------------------
+  # ACM 인증서
+  # -----------------------------
+  create_acm_certificate = var.create_acm_certificate
+  acm_domain_name        = var.acm_domain_name
+  acm_certificate_arn    = var.acm_certificate_arn
+  acm_validation_method  = "DNS"
+
+  # -----------------------------
+  # Ingress 설정
+  # -----------------------------
+  ingress_name         = var.ingress_name
+  load_balancer_name   = var.load_balancer_name
+  ingress_class_name   = local.ingress_class_name
+  alb_scheme           = var.alb_scheme
+  ssl_redirect_enabled = var.ssl_redirect_enabled
+  ssl_policy           = "ELBSecurityPolicy-TLS-1-2-2017-01"
+
+  # -----------------------------
+  # Health Check
+  # -----------------------------
+  health_check = {
+    protocol            = "HTTP"
+    port                = "traffic-port"
+    interval_seconds    = 15
+    timeout_seconds     = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    success_codes       = "200"
+  }
+
+  # -----------------------------
+  # 백엔드 서비스 연결
+  # 실무: App 모듈의 output을 참조하여 Service 연결
+  # -----------------------------
+  backend_services = [
+    for app in local.external_apps : {
+      name              = module.apps[app.name].service_name
+      port              = module.apps[app.name].service_port
+      path              = app.ingress_path
+      path_type         = app.ingress_path_type
+      health_check_path = app.health_check_path
+      is_default        = app.is_default
+    }
+  ]
+
+  # 태그
+  tags = var.tags
+
+  # App 모듈이 먼저 생성되어야 함
+  depends_on = [module.apps]
+}
 

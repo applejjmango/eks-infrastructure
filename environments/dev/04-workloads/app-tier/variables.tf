@@ -18,173 +18,101 @@ variable "project_name" {
   type        = string
   default     = "playdevops"
 }
-
-
-variable "cluster_name" {
-  description = "EKS 클러스터 이름"
-  type        = string
-}
-
-# ===== 애플리케이션 기본 설정 =====
-
-
 variable "namespace" {
-  description = "K8s 네임스페이스"
+  description = "Kubernetes 네임스페이스"
   type        = string
   default     = "default"
 }
-
-variable "create_namespace" {
-  description = "네임스페이스 생성 여부"
-  type        = bool
-  default     = false
-}
-
-# ===== 컨테이너 이미지 =====
-variable "image_repository" {
-  description = "컨테이너 이미지 레포지토리"
-  type        = string
-  # 기존: stacksimplify/kubenginx
-  # 실무: 123456789012.dkr.ecr.us-east-1.amazonaws.com/playdevops-webapp
-}
-
-variable "image_tag" {
-  description = "이미지 태그 (latest 사용 금지)"
-  type        = string
-  # 실무: 1.0.0, v2.3.1 등 특정 버전
-}
-
-variable "app_version" {
-  description = "애플리케이션 버전"
-  type        = string
-  default     = "1.0.0"
-}
-
-# ===== Deployment 설정 =====
-variable "replicas" {
-  description = "Pod 복제본 수 (dev=1, staging=2, prod=3+)"
-  type        = number
-  default     = 1
-}
-
-# ===== 컨테이너 설정 =====
-variable "container_port" {
-  description = "컨테이너 포트"
-  type        = number
-  default     = 80
-  # nginx: 80
-  # Spring Boot: 8080
-  # Node.js: 3000
-}
-
-variable "cpu_request" {
-  description = "CPU 요청량 (100m = 0.1 core)"
-  type        = string
-  default     = "100m"
-}
-
-variable "memory_request" {
-  description = "메모리 요청량"
-  type        = string
-  default     = "128Mi"
-}
-
-variable "cpu_limit" {
-  description = "CPU 제한량"
-  type        = string
-  default     = "200m"
-}
-
-variable "memory_limit" {
-  description = "메모리 제한량"
-  type        = string
-  default     = "256Mi"
-}
-
-# ===== Health Check =====
-variable "liveness_probe_path" {
-  description = "Liveness Probe 경로"
-  type        = string
-  default     = "/"
-  # nginx: /
-  # Spring Boot: /actuator/health
-}
-
-variable "liveness_probe_initial_delay" {
-  description = "Liveness Probe 초기 대기 (초)"
-  type        = number
-  default     = 30
-}
-
-variable "readiness_probe_path" {
-  description = "Readiness Probe 경로"
-  type        = string
-  default     = "/"
-  # nginx: /
-  # Spring Boot: /actuator/health/readiness
-}
-
-variable "readiness_probe_initial_delay" {
-  description = "Readiness Probe 초기 대기 (초)"
-  type        = number
-  default     = 10
-}
-
-# ===== 환경 변수 =====
-variable "environment_variables" {
-  description = "컨테이너 환경 변수"
-  type        = map(string)
-  default     = {}
-  # 예: {"DATABASE_HOST" = "mysql.default.svc.cluster.local"}
-}
-
-variable "config_map_data" {
-  description = "ConfigMap 데이터"
-  type        = map(string)
-  default     = {}
-}
-
-# ===== 스토리지 =====
-variable "enable_persistent_storage" {
-  description = "영구 스토리지 사용 여부"
+# -----------------------------------------------------------------------------
+# Ingress 활성화 여부
+# 실무: 모든 앱이 외부 노출이 필요한 것은 아님
+# -----------------------------------------------------------------------------
+variable "enable_ingress" {
+  description = "ALB Ingress 생성 여부"
   type        = bool
   default     = true
 }
 
-variable "pvc_storage_size" {
-  description = "PVC 크기"
+# -----------------------------------------------------------------------------
+# ACM/SSL 설정
+# -----------------------------------------------------------------------------
+variable "acm_domain_name" {
+  description = "ACM 인증서 도메인 (예: *.example.com)"
   type        = string
-  default     = "4Gi"
+  default     = null # Ingress 비활성화 시 null 가능
 }
 
-variable "volume_mount_path" {
-  description = "볼륨 마운트 경로"
+variable "create_acm_certificate" {
+  description = "새 ACM 인증서 생성 여부 (false면 기존 인증서 사용)"
+  type        = bool
+  default     = true
+}
+
+variable "acm_certificate_arn" {
+  description = "기존 ACM 인증서 ARN (create_acm_certificate=false 시 필수)"
   type        = string
-  default     = "/usr/share/nginx/html"
-  # nginx: /usr/share/nginx/html
-  # 파일 업로드: /app/uploads
+  default     = null
 }
 
-# ===== Service =====
-variable "service_type" {
-  description = "Service 타입 (ClusterIP/LoadBalancer/NodePort)"
+# -----------------------------------------------------------------------------
+# Ingress 설정
+# -----------------------------------------------------------------------------
+variable "ingress_name" {
+  description = "Ingress 이름"
   type        = string
-  default     = "LoadBalancer"
+  default     = "app-ingress"
 }
 
-variable "service_port" {
-  description = "Service 포트"
-  type        = number
-  default     = 80
+variable "load_balancer_name" {
+  description = "ALB 이름 (AWS 콘솔 표시용)"
+  type        = string
+  default     = "app-alb"
 }
 
-# ===== 노드 선택 =====
-variable "node_selector" {
-  description = "노드 셀렉터"
-  type        = map(string)
-  default     = {}
-  # 예: {"workload-type" = "application"}
+variable "alb_scheme" {
+  description = "ALB 스킴 (internet-facing, internal)"
+  type        = string
+  default     = "internet-facing"
 }
+
+variable "ssl_redirect_enabled" {
+  description = "HTTP → HTTPS 리다이렉트 활성화"
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
+# 앱 설정
+# -----------------------------------------------------------------------------
+variable "apps" {
+  description = "배포할 애플리케이션 목록"
+  type = list(object({
+    name              = string # 앱 이름
+    image             = string # 컨테이너 이미지
+    replicas          = number # Pod 복제본 수
+    container_port    = number # 컨테이너 포트
+    health_check_path = string # 헬스체크 경로
+
+    # Ingress 라우팅 설정
+    ingress_path      = string # URL 경로 (예: /app1)
+    ingress_path_type = string # Prefix, Exact
+    is_default        = bool   # 기본 백엔드 여부
+
+    # 외부 노출 여부 (Ingress에 포함할지)
+    expose_external = bool # true: Ingress에 포함, false: 내부용
+
+    # 리소스 설정 (선택적)
+    resources = optional(object({
+      requests_cpu    = string
+      requests_memory = string
+      limits_cpu      = string
+      limits_memory   = string
+    }))
+  }))
+}
+
+
+
 
 # ============================================
 # Tags

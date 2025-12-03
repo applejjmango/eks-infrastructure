@@ -149,3 +149,11 @@ output "alb_controller_verification_commands" {
   %{endif}
   EOT
 }
+
+# -----------------------------------------------------------------------------
+# IngressClass (핵심!)
+# -----------------------------------------------------------------------------
+output "ingress_class_name" {
+  description = "AWS ALB IngressClass 이름"
+  value       = length(module.aws_load_balancer_controller) > 0 ? module.aws_load_balancer_controller[0].ingress_class_name : null
+}

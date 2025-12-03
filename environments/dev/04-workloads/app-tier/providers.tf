@@ -5,9 +5,15 @@ provider "aws" {
   region = var.aws_region
 
   default_tags {
-    tags = local.common_tags
+    tags = {
+      Environment = var.environment
+      Project     = var.project_name
+      ManagedBy   = "terraform"
+      Layer       = "workloads"
+    }
   }
 }
+
 
 # ============================================
 # Data Sources for Kubernetes/Helm Providers

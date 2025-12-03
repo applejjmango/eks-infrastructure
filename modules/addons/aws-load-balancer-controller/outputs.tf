@@ -20,6 +20,14 @@ output "iam_role_name" {
   value       = aws_iam_role.lbc.name
 }
 
+# -----------------------------------------------------------------------------
+# IngressClass 출력
+# -----------------------------------------------------------------------------
+output "ingress_class_name" {
+  description = "AWS LBC가 생성한 IngressClass 이름"
+  value       = var.ingress_class_name
+}
+
 # ============================================
 # Helm Release
 # ============================================

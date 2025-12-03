@@ -1,53 +1,69 @@
+# =============================================================================
+# Kubernetes App 모듈 - Outputs
+# =============================================================================
+# 실무 관점: 다른 모듈(Ingress 등)에서 참조할 정보 제공
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Namespace 출력
+# -----------------------------------------------------------------------------
 output "namespace" {
-  description = "배포된 네임스페이스"
+  description = "앱이 배포된 네임스페이스"
   value       = local.namespace
 }
 
+# -----------------------------------------------------------------------------
+# Deployment 출력
+# -----------------------------------------------------------------------------
 output "deployment_name" {
   description = "Deployment 이름"
-  value       = kubernetes_deployment_v1.app.metadata[0].name
+  value       = kubernetes_deployment_v1.this.metadata[0].name
 }
 
-output "deployment_uid" {
-  description = "Deployment UID"
-  value       = kubernetes_deployment_v1.app.metadata[0].uid
+output "deployment_labels" {
+  description = "Deployment 레이블"
+  value       = kubernetes_deployment_v1.this.metadata[0].labels
 }
 
+output "selector_labels" {
+  description = "Pod selector 레이블 (Service 연결용)"
+  value       = local.selector_labels
+}
+
+# -----------------------------------------------------------------------------
+# Service 출력
+# -----------------------------------------------------------------------------
 output "service_name" {
   description = "Service 이름"
-  value       = var.create_service ? kubernetes_service.app[0].metadata[0].name : null
+  value       = var.create_service ? kubernetes_service_v1.this[0].metadata[0].name : null
 }
 
-output "service_cluster_ip" {
-  description = "Service Cluster IP"
-  value       = var.create_service ? kubernetes_service.app[0].spec[0].cluster_ip : null
+output "service_port" {
+  description = "Service 포트"
+  value       = var.create_service ? var.service_port : null
 }
 
-output "load_balancer_hostname" {
-  description = "LoadBalancer 호스트명 (service_type=LoadBalancer 시)"
-  value = var.create_service && var.service_type == "LoadBalancer" ? (
-    length(kubernetes_service.app[0].status[0].load_balancer) > 0 &&
-    length(kubernetes_service.app[0].status[0].load_balancer[0].ingress) > 0 ?
-    kubernetes_service.app[0].status[0].load_balancer[0].ingress[0].hostname : null
-  ) : null
+output "service_type" {
+  description = "Service 타입"
+  value       = var.create_service ? var.service_type : null
 }
 
-output "pvc_name" {
-  description = "PVC 이름"
-  value       = var.enable_persistent_storage ? kubernetes_persistent_volume_claim.app[0].metadata[0].name : null
+# Cluster 내부 DNS
+output "service_dns" {
+  description = "Service DNS 이름 (클러스터 내부)"
+  value       = var.create_service ? "${kubernetes_service_v1.this[0].metadata[0].name}.${local.namespace}.svc.cluster.local" : null
 }
 
-output "config_map_name" {
-  description = "ConfigMap 이름"
-  value       = length(var.config_map_data) > 0 ? kubernetes_config_map.app[0].metadata[0].name : null
-}
-
-output "gp3_storage_class_name" {
-  description = "gp3 StorageClass 이름"
-  value       = kubernetes_storage_class_v1.gp3.metadata[0].name
-}
-
-output "gp3_provisioner" {
-  description = "gp3 Provisioner"
-  value       = kubernetes_storage_class_v1.gp3.storage_provisioner
+# -----------------------------------------------------------------------------
+# 앱 정보 요약 (Ingress 모듈에서 활용)
+# -----------------------------------------------------------------------------
+output "app_info" {
+  description = "앱 정보 요약 (Ingress 연동용)"
+  value = {
+    name              = var.app_name
+    namespace         = local.namespace
+    service_name      = var.create_service ? kubernetes_service_v1.this[0].metadata[0].name : null
+    service_port      = var.service_port
+    health_check_path = var.health_check_path
+  }
 }

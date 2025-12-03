@@ -1,93 +1,135 @@
-# ===== Outputs =====
-# 실무: 배포 정보 출력 (디버깅 및 확인용)
-output "deployment_info" {
-  description = "playdevops WebApp 배포 정보"
+# =============================================================================
+# App Tier - Outputs
+# =============================================================================
+# 실무: 운영팀/개발팀이 확인할 정보
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 앱 정보
+# -----------------------------------------------------------------------------
+output "app_deployments" {
+  description = "배포된 Deployment 목록"
+  value       = { for k, v in module.apps : k => v.deployment_name }
+}
+
+output "app_services" {
+  description = "배포된 Service 목록"
   value = {
-    namespace          = module.playdevops.namespace
-    deployment_name    = module.playdevops.deployment_name
-    service_name       = module.playdevops.service_name
-    service_cluster_ip = module.playdevops.service_cluster_ip
-    load_balancer_url  = module.playdevops.load_balancer_hostname
-    pvc_name           = module.playdevops.pvc_name
-    config_map_name    = module.playdevops.config_map_name
+    for k, v in module.apps : k => {
+      name = v.service_name
+      type = v.service_type
+      dns  = v.service_dns
+    }
   }
 }
 
-# 실무: kubectl 명령어 가이드
-output "kubectl_commands" {
-  description = "유용한 kubectl 명령어"
+# -----------------------------------------------------------------------------
+# Ingress 정보 (활성화된 경우만)
+# -----------------------------------------------------------------------------
+output "ingress_enabled" {
+  description = "Ingress 활성화 여부"
+  value       = var.enable_ingress && length(local.external_apps) > 0
+}
+
+output "ingress_name" {
+  description = "Ingress 이름"
+  value       = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].ingress_name : null
+}
+
+output "alb_dns_name" {
+  description = "ALB DNS 이름 (Route53 Alias 대상)"
+  value       = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].ingress_hostname : null
+}
+
+# -----------------------------------------------------------------------------
+# ACM 인증서 정보
+# -----------------------------------------------------------------------------
+output "acm_certificate_arn" {
+  description = "ACM 인증서 ARN"
+  value       = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].acm_certificate_arn : null
+}
+
+output "acm_certificate_status" {
+  description = "ACM 인증서 상태 (ISSUED 확인 필요)"
+  value       = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].acm_certificate_status : null
+}
+
+output "acm_validation_options" {
+  description = "DNS 검증용 CNAME 레코드 정보"
+  value       = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].acm_domain_validation_options : null
+}
+
+# -----------------------------------------------------------------------------
+# 외부/내부 앱 분류
+# -----------------------------------------------------------------------------
+output "external_apps" {
+  description = "외부 노출 앱 목록 (Ingress 포함)"
+  value       = [for app in var.apps : app.name if app.expose_external]
+}
+
+output "internal_apps" {
+  description = "내부용 앱 목록 (Ingress 미포함)"
+  value       = [for app in var.apps : app.name if !app.expose_external]
+}
+
+# -----------------------------------------------------------------------------
+# 검증 명령어
+# -----------------------------------------------------------------------------
+output "verification_commands" {
+  description = "배포 검증을 위한 kubectl 명령어"
   value       = <<-EOT
-    # ===== Pod 관리 =====
-    # Pod 목록 확인
-    kubectl get pods -n ${module.playdevops.namespace} -l app=${var.project_name}
     
-    # Pod 상태 실시간 확인
-    kubectl get pods -n ${module.playdevops.namespace} -l app=${var.project_name} -w
+    # ========================================
+    # 리소스 확인
+    # ========================================
     
-    # Pod 상세 정보
-    kubectl describe pod -n ${module.playdevops.namespace} -l app=${var.project_name}
+    # Deployment 확인
+    kubectl get deployments -n ${var.namespace}
     
-    # Pod 로그 확인 (실시간)
-    kubectl logs -n ${module.playdevops.namespace} -l app=${var.project_name} --tail=100 -f
+    # Pod 확인
+    kubectl get pods -n ${var.namespace}
     
-    # ===== Deployment 관리 =====
-    # Deployment 상태
-    kubectl get deployment ${var.project_name} -n ${module.playdevops.namespace}
+    # Service 확인
+    kubectl get svc -n ${var.namespace}
     
-    # Deployment 상세 정보
-    kubectl describe deployment ${var.project_name} -n ${module.playdevops.namespace}
+    # Ingress 확인
+    kubectl get ingress -n ${var.namespace}
+    kubectl describe ingress ${var.ingress_name} -n ${var.namespace}
     
-    # 수동 재시작 (롤링 업데이트)
-    kubectl rollout restart deployment/${var.project_name} -n ${module.playdevops.namespace}
+    # ========================================
+    # 접속 테스트 (ALB DNS)
+    # ========================================
+    %{if var.enable_ingress && length(local.external_apps) > 0~}
+    # HTTP 테스트 (HTTPS로 리다이렉트됨)
+    %{for app in local.external_apps~}
+    curl -v http://${module.alb_ssl_ingress[0].ingress_hostname}${app.ingress_path}/
+    %{endfor~}
     
-    # 롤링 업데이트 상태 확인
-    kubectl rollout status deployment/${var.project_name} -n ${module.playdevops.namespace}
+    # HTTPS 테스트 (Route53 도메인 설정 후)
+    # curl -v https://your-domain.com/app1/index.html
+    %{endif~}
     
-    # 롤백
-    kubectl rollout undo deployment/${var.project_name} -n ${module.playdevops.namespace}
+    # ========================================
+    # 내부 서비스 테스트 (클러스터 내부)
+    # ========================================
+    # kubectl run -it --rm debug --image=curlimages/curl -- sh
+    # curl http://<service-name>.<namespace>.svc.cluster.local/
     
-    # 롤아웃 히스토리
-    kubectl rollout history deployment/${var.project_name} -n ${module.playdevops.namespace}
-    
-    # ===== 스토리지 관리 =====
-    # PVC 상태
-    kubectl get pvc -n ${module.playdevops.namespace}
-    
-    # PVC 상세 정보
-    kubectl describe pvc -n ${module.playdevops.namespace}
-    
-    # ===== 네트워크 관리 =====
-    # Service 상태
-    kubectl get svc ${var.project_name} -n ${module.playdevops.namespace}
-    
-    # Service 상세 정보
-    kubectl describe svc ${var.project_name} -n ${module.playdevops.namespace}
-    
-    # LoadBalancer 주소 확인
-    kubectl get svc ${var.project_name} -n ${module.playdevops.namespace} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-    
-    # ===== 디버깅 =====
-    # Pod 내부 접속
-    kubectl exec -it -n ${module.playdevops.namespace} <pod-name> -- /bin/bash
-    
-    # 이벤트 확인
-    kubectl get events -n ${module.playdevops.namespace} --sort-by='.lastTimestamp'
-    
-    # 리소스 사용량 확인
-    kubectl top pods -n ${module.playdevops.namespace} -l app=${var.project_name}
-    
-    # ===== 애플리케이션 접속 =====
-    # LoadBalancer URL로 접속
-    curl http://${module.playdevops.load_balancer_hostname}
   EOT
 }
 
-# 실무: LoadBalancer URL 출력 (웹 브라우저 접속용)
-output "application_url" {
-  description = "애플리케이션 접속 URL"
-  value = var.service_type == "LoadBalancer" ? (
-    module.playdevops.load_balancer_hostname != null ?
-    "http://${module.playdevops.load_balancer_hostname}" :
-    "LoadBalancer 생성 중..."
-  ) : "ClusterIP 서비스 (내부 접근만 가능)"
+# -----------------------------------------------------------------------------
+# 요약 정보
+# -----------------------------------------------------------------------------
+output "summary" {
+  description = "배포 요약"
+  value = {
+    environment     = var.environment
+    namespace       = var.namespace
+    total_apps      = length(var.apps)
+    external_apps   = length([for app in var.apps : app if app.expose_external])
+    internal_apps   = length([for app in var.apps : app if !app.expose_external])
+    ingress_enabled = var.enable_ingress
+    alb_dns         = var.enable_ingress && length(local.external_apps) > 0 ? module.alb_ssl_ingress[0].ingress_hostname : "N/A"
+  }
 }
