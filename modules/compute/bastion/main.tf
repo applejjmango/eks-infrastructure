@@ -140,20 +140,6 @@ resource "null_resource" "copy_key" {
     timeout     = "5m"
   }
 
-  # Copy private key to bastion
-  provisioner "file" {
-    source      = var.private_key_path
-    destination = "/tmp/${basename(var.instance_keypair)}.pem"
-  }
-
-  # Set proper permissions
-  provisioner "remote-exec" {
-    inline = [
-      "sudo chmod 400 /tmp/${basename(var.instance_keypair)}.pem",
-      "echo 'Private key copied successfully'"
-    ]
-  }
-
   # Local exec for logging
   provisioner "local-exec" {
     command     = "echo 'Bastion Host created at ${aws_eip.bastion.public_ip} on ${timestamp()}' >> bastion-creation.log"
