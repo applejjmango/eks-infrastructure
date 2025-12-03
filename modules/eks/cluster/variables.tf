@@ -74,8 +74,8 @@ variable "cluster_endpoint_public_access" {
 variable "cluster_endpoint_public_access_cidrs" {
   description = "List of CIDR blocks allowed to access the public API server endpoint"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # ⚠️ Production에서는 제한 필요
-  # default     = []  # ✅ 기본값 비움 (Private access만 사용)
+  default     = ["0.0.0.0/0"] # ⚠️ Production에서는 제한 필요 
+  # default     = []  # ✅ 기본값 비움 (Private access만 사용) [PROD] dev.tfvars 등에서 회사의 VPN IP나 NAT Gateway IP 등 신뢰할 수 있는 CIDR만 허용하도록 강제해야 합니다.
 
   validation {
     condition = alltrue([

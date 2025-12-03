@@ -10,6 +10,7 @@
 data "http" "lbc_iam_policy" {
   url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json"
 
+  # [PROD] file(()) 로 업로드 된 파일 사용 (iam-policy.json)
   request_headers = {
     Accept = "application/json"
   }
