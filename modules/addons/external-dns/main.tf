@@ -1,102 +1,87 @@
-# 1. IRSA Role for ExternalDNS
-resource "aws_iam_role" "external_dns" {
-  name = "${var.cluster_name}-external-dns"
-  tags = var.common_tags
+# =============================================================================
+# 1. IAM Policy & Role (IRSA)
+# =============================================================================
+# ExternalDNS 권한 정의 (Scope Down 적용)
+module "irsa_role" {
+  source = "../../iam/irsa"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
-      Principal = { Federated = var.oidc_provider_arn }
-      Condition = {
-        StringEquals = {
-          "${replace(var.oidc_issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:external-dns"
-          "${replace(var.oidc_issuer, "https://", "")}:aud" = "sts.amazonaws.com"
-        }
-      }
-    }]
-  })
+  name                 = "${var.cluster_name}-external-dns"
+  namespace            = var.namespace
+  service_account_name = "external-dns"
+
+  oidc_provider_arn = var.oidc_provider_arn
+  oidc_provider     = var.oidc_provider
+
+  iam_policy_statements = [
+    {
+      sid     = "ChangeResourceRecordSets"
+      effect  = "Allow"
+      actions = ["route53:ChangeResourceRecordSets"]
+      # [보안] 특정 Hosted Zone만 수정 가능하도록 제한
+      resources = ["arn:aws:route53:::hostedzone/${var.hosted_zone_id}"]
+    },
+    {
+      sid       = "ListResourceRecordSets"
+      effect    = "Allow"
+      actions   = ["route53:ListHostedZones", "route53:ListResourceRecordSets"]
+      resources = ["*"]
+    }
+  ]
+
+  tags = var.tags
 }
 
-# 2. Inline IAM Policy for Route 53
-resource "aws_iam_policy" "external_dns" {
-  name   = "${var.cluster_name}-external-dns-policy"
-  policy = data.aws_iam_policy_document.external_dns.json
-  tags   = var.common_tags
-}
-
-# 3. Attach Policy
-resource "aws_iam_role_policy_attachment" "external_dns" {
-  policy_arn = aws_iam_policy.external_dns.arn
-  role       = aws_iam_role.external_dns.name
-}
-
-# 4. Deploy Helm Chart
+# =============================================================================
+# 2. Helm Release (ExternalDNS 배포)
+# =============================================================================
 resource "helm_release" "external_dns" {
   name       = "external-dns"
-  repository = "https://kubernetes-sigs.github.io/external-dns"
+  repository = "https://kubernetes-sigs.github.io/external-dns/"
   chart      = "external-dns"
-  namespace  = "kube-system"
   version    = var.chart_version
-  wait       = true
+  namespace  = var.namespace # kube-system
 
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-  set {
-    name  = "serviceAccount.name"
-    value = "external-dns"
-  }
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.external_dns.arn
-  }
-  
-  # Provider settings
-  set {
-    name  = "provider"
-    value = "aws"
-  }
-  set {
-    name  = "aws.zoneType"
-    value = "public"
-  }
-  set {
-    name  = "zoneIdFilters[0]"
-    value = var.hosted_zone_id
-  }
-  set {
-    name  = "domainFilters[0]"
-    value = var.domain_filter
-  }
-  set {
-    name = "policy"
-    value = "upsert-only" # (Safe) Only create/update, never delete
-  }
+  # ---------------------------------------------------------------------------
+  # Helm Values (Modern Approach using yamlencode)
+  # ---------------------------------------------------------------------------
+  values = [
+    yamlencode({
+      # 이미지 설정
+      image = {
+        repository = "registry.k8s.io/external-dns/external-dns"
+      }
 
-  depends_on = [ aws_iam_role_policy_attachment.external_dns ]
-}
+      # 서비스 계정 설정 (IRSA 연결)
+      serviceAccount = {
+        create = true
+        name   = "external-dns"
+        annotations = {
+          # 점(.)이 들어간 키도 별도 이스케이프 없이 깔끔하게 작성 가능
+          "eks.amazonaws.com/role-arn" = module.irsa_role.iam_role_arn
+        }
+      }
 
-# --- IAM Policy Document ---
-data "aws_iam_policy_document" "external_dns" {
-  statement {
-    sid    = "AllowRoute53List"
-    effect = "Allow"
-    actions = [
-      "route53:ListHostedZones",
-      "route53:ListResourceRecordSets"
-    ]
-    resources = ["*"]
-  }
-  statement {
-    sid    = "AllowRoute53Change"
-    effect = "Allow"
-    actions = [
-      "route53:ChangeResourceRecordSets"
-    ]
-    # (Security) Only allow changes to the specified Hosted Zone
-    resources = ["arn:aws:route53:::hostedzone/${var.hosted_zone_id}"]
-  }
+      # Provider 설정 (AWS)
+      provider = "aws"
+
+      # AWS 세부 설정
+      aws = {
+        zoneType = "public"
+        region   = var.aws_region
+      }
+
+      # [보안] Domain Filter: 관리할 도메인 리스트
+      # set 방식보다 훨씬 직관적임 (리스트 그대로 전달)
+      domainFilters = var.domain_filters
+
+      # [충돌 방지] TXT Owner ID: 클러스터 식별자
+      txtOwnerId = var.cluster_name
+
+      # [운영] Sync Policy: 리소스 삭제 시 DNS 레코드 자동 정리
+      policy = "sync" #[PROD] => upsert-only
+
+      # (선택 사항) 로그 레벨 조정
+      logLevel = "info"
+    })
+  ]
 }

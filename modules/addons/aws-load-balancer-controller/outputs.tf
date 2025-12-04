@@ -12,13 +12,15 @@ output "iam_policy_arn" {
 
 output "iam_role_arn" {
   description = "ARN of the IAM Role for AWS Load Balancer Controller (IRSA)"
-  value       = aws_iam_role.lbc.arn
+  value       = module.irsa_role.iam_role_arn
 }
 
+# ▼▼▼ [수정] aws_iam_role.lbc -> module.irsa_role 로 변경 ▼▼▼
 output "iam_role_name" {
   description = "Name of the IAM Role for AWS Load Balancer Controller"
-  value       = aws_iam_role.lbc.name
+  value       = module.irsa_role.iam_role_name
 }
+
 
 # -----------------------------------------------------------------------------
 # IngressClass 출력

@@ -107,7 +107,6 @@ module "aws_load_balancer_controller" {
   common_tags = local.common_tags
 }
 
-/*
 # ============================================
 # External DNS (with IRSA)
 # ============================================
@@ -115,24 +114,28 @@ module "external_dns" {
   source = "../../../modules/addons/external-dns"
   count  = var.enable_external_dns ? 1 : 0
 
-  name             = "${local.name}-external-dns"
-  eks_cluster_name = local.eks_cluster_name
+  # 기본 정보
+  cluster_name = local.eks_cluster_name
+  aws_region   = var.aws_region
 
-  # OIDC Provider
+  # OIDC 정보 (Remote State에서 가져옴)
   oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
   oidc_provider     = data.terraform_remote_state.eks.outputs.oidc_provider
 
-  # Route53
+  # Route53 설정
   hosted_zone_id = var.external_dns_hosted_zone_id
   domain_filters = var.external_dns_domain_filters
 
-  # Helm Chart
+  # Namespace (kube-system)
+  namespace = "kube-system"
+
+  # Helm 버전
   chart_version = var.external_dns_chart_version
 
   tags = local.common_tags
 }
 
-
+/*
 
 # ============================================
 # Cert Manager (with IRSA)

@@ -1,57 +1,47 @@
-# Input Variables - Placeholder file
-# AWS Region
-variable "aws_region" {
-  description = "Region in which AWS Resources to be created"
-  type        = string
-  default     = "us-east-1"
-}
-# Environment Variable
-variable "environment" {
-  description = "Environment Variable used as a prefix"
-  type        = string
-  default     = "dev"
-}
-#  Division
-variable "division" {
-  description = "Organizational or technical division responsible for this infrastructure"
-  type        = string
-  default     = "CloudInfra"
-}
-
-
 variable "cluster_name" {
-  description = "Name of the EKS cluster"
+  description = "EKS Cluster name (used for TXT Owner ID)"
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS Region"
   type        = string
 }
 
 variable "oidc_provider_arn" {
-  description = "ARN of the cluster's OIDC Provider"
+  description = "OIDC Provider ARN for IRSA"
   type        = string
 }
 
-variable "oidc_issuer" {
-  description = "URL of the cluster's OIDC Issuer"
+variable "oidc_provider" {
+  description = "OIDC Provider URL (without https://)"
   type        = string
 }
 
 variable "chart_version" {
   description = "Helm chart version for external-dns"
   type        = string
-  default     = "1.14.5"
+  default     = "1.14.5" # 최신 안정 버전
 }
 
 variable "hosted_zone_id" {
-  description = "Route 53 Hosted Zone ID to manage"
+  description = "Route 53 Hosted Zone ID to manage (Scope Down for Security)"
   type        = string
 }
 
-variable "domain_filter" {
-  description = "Domain filter for ExternalDNS (e.g., 'example.com')"
-  type        = string
+variable "domain_filters" {
+  description = "List of domains to manage (e.g. ['playdevops.click'])"
+  type        = list(string)
 }
 
-variable "common_tags" {
-  description = "Map of common tags"
+variable "namespace" {
+  description = "Namespace to install ExternalDNS"
+  type        = string
+  default     = "kube-system" # [중요] 실무 권장 기본값
+}
+
+variable "tags" {
+  description = "Common tags"
   type        = map(string)
   default     = {}
 }

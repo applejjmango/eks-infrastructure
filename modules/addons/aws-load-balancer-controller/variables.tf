@@ -36,12 +36,27 @@ variable "aws_region" {
 }
 
 # ============================================
+# Kubernetes Config Variables 
+# ============================================
+variable "namespace" {
+  description = "Kubernetes namespace to install the controller"
+  type        = string
+  default     = "kube-system"
+}
+
+variable "service_account_name" {
+  description = "Kubernetes Service Account name"
+  type        = string
+  default     = "aws-load-balancer-controller"
+}
+
+# ============================================
 # Optional Variables
 # ============================================
 variable "helm_chart_version" {
   description = "AWS Load Balancer Controller Helm chart version"
   type        = string
-  default     = "1.6.2" # 최신 버전으로 업데이트 가능
+  default     = "1.14.5" # 최신 버전으로 업데이트 가능
 }
 
 variable "ecr_account_id" {

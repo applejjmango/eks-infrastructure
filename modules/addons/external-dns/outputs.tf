@@ -1,4 +1,9 @@
-output "irsa_role_arn" {
-  description = "The ARN of the IAM role for the ExternalDNS"
-  value       = aws_iam_role.external_dns.arn
+output "iam_role_arn" {
+  description = "Created IAM Role ARN"
+  value       = module.irsa_role.iam_role_arn
+}
+
+output "helm_release_metadata" {
+  description = "Helm Release Metadata"
+  value       = helm_release.external_dns.metadata
 }

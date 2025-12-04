@@ -81,6 +81,7 @@ variable "mysql_root_password" {
   description = "MySQL root password"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "mysql_image" {
@@ -159,6 +160,31 @@ variable "alb_controller_is_default" {
   default     = true
 }
 
+# ============================================
+# ExternalDNS Variables
+# ============================================
+variable "enable_external_dns" {
+  description = "Enable ExternalDNS add-on"
+  type        = bool
+  default     = true
+}
+
+variable "external_dns_chart_version" {
+  description = "Helm chart version for ExternalDNS"
+  type        = string
+  default     = "1.14.5"
+}
+
+variable "external_dns_hosted_zone_id" {
+  description = "Route53 Hosted Zone ID for ExternalDNS to manage"
+  type        = string
+}
+
+variable "external_dns_domain_filters" {
+  description = "List of domains for ExternalDNS to manage"
+  type        = list(string)
+  default     = ["playdevops.click"]
+}
 
 # ============================================
 # Tags

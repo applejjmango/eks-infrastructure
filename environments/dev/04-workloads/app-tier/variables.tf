@@ -112,7 +112,11 @@ variable "apps" {
 }
 
 
-
+variable "hosted_zone_id" {
+  description = "ACM 검증을 위한 Route53 Hosted Zone ID"
+  type        = string
+  default     = null
+}
 
 # ============================================
 # Tags

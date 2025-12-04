@@ -140,6 +140,8 @@ module "alb_ssl_ingress" {
   acm_certificate_arn    = var.acm_certificate_arn
   acm_validation_method  = "DNS"
 
+  hosted_zone_id = var.hosted_zone_id
+
   # -----------------------------
   # Ingress 설정
   # -----------------------------

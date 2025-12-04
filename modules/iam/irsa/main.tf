@@ -1,16 +1,11 @@
-# ============================================
-# IRSA Module - Generic Implementation
-# 모든 EKS Add-ons에서 사용 가능
-# ============================================
-
-# ============================================
-# IAM Policy Document
-# ============================================
-data "aws_iam_policy_document" "irsa_policy_doc" {
+# =============================================================================
+# IAM Policy Document 생성 (JSON 변환)
+# =============================================================================
+data "aws_iam_policy_document" "this" {
   dynamic "statement" {
     for_each = var.iam_policy_statements
-
     content {
+      sid       = statement.value.sid
       effect    = statement.value.effect
       actions   = statement.value.actions
       resources = statement.value.resources
@@ -18,27 +13,22 @@ data "aws_iam_policy_document" "irsa_policy_doc" {
   }
 }
 
-# ============================================
-# IAM Policy
-# ============================================
-resource "aws_iam_policy" "irsa_policy" {
-  name        = "${var.name}-policy"
-  path        = "/"
-  description = "IAM Policy for ${var.name}"
-  policy      = data.aws_iam_policy_document.irsa_policy_doc.json
+# =============================================================================
+# IAM Policy 생성
+# =============================================================================
+resource "aws_iam_policy" "this" {
+  count = length(var.iam_policy_statements) > 0 ? 1 : 0
 
-  tags = merge(
-    var.tags,
-    {
-      Name = "${var.name}-policy"
-    }
-  )
+  name        = "${var.name}-policy"
+  description = "IAM Policy for ${var.name}"
+  policy      = data.aws_iam_policy_document.this.json
+  tags        = var.tags
 }
 
-# ============================================
-# IAM Role for IRSA
-# ============================================
-resource "aws_iam_role" "irsa_role" {
+# =============================================================================
+# IAM Role 생성 (Trust Policy 포함)
+# =============================================================================
+resource "aws_iam_role" "this" {
   name = "${var.name}-role"
 
   assume_role_policy = jsonencode({
@@ -52,7 +42,8 @@ resource "aws_iam_role" "irsa_role" {
         }
         Condition = {
           StringEquals = {
-            "${var.oidc_provider}:sub" = "system:serviceaccount:${var.namespace}:${var.service_account_name}"
+            # [보안] 특정 네임스페이스와 서비스 어카운트만 이 역할을 맡을 수 있음
+            "${var.oidc_provider}:sub" = "system:serviceaccount:${var.namespace}:${var.service_account_name}",
             "${var.oidc_provider}:aud" = "sts.amazonaws.com"
           }
         }
@@ -60,34 +51,15 @@ resource "aws_iam_role" "irsa_role" {
     ]
   })
 
-  tags = merge(
-    var.tags,
-    {
-      Name = "${var.name}-role"
-    }
-  )
+  tags = var.tags
 }
 
-# ============================================
-# Attach Policy to Role
-# ============================================
-resource "aws_iam_role_policy_attachment" "irsa_policy_attach" {
-  policy_arn = aws_iam_policy.irsa_policy.arn
-  role       = aws_iam_role.irsa_role.name
-}
+# =============================================================================
+# Role과 Policy 연결
+# =============================================================================
+resource "aws_iam_role_policy_attachment" "this" {
+  count = length(var.iam_policy_statements) > 0 ? 1 : 0
 
-# ============================================
-# Kubernetes Service Account (Optional)
-# ============================================
-resource "kubernetes_service_account_v1" "service_account" {
-  count = var.create_service_account ? 1 : 0
-
-  metadata {
-    name      = var.service_account_name
-    namespace = var.namespace
-
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.irsa_role.arn
-    }
-  }
+  role       = aws_iam_role.this.name
+  policy_arn = length(aws_iam_policy.this) > 0 ? aws_iam_policy.this[0].arn : ""
 }
