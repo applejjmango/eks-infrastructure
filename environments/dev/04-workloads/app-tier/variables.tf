@@ -33,6 +33,12 @@ variable "enable_ingress" {
   default     = true
 }
 
+variable "ingress_hostnames" {
+  description = "Ingress에 연결할 호스트네임 목록"
+  type        = list(string)
+  default     = []
+}
+
 # -----------------------------------------------------------------------------
 # ACM/SSL 설정
 # -----------------------------------------------------------------------------

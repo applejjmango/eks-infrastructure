@@ -148,6 +148,7 @@ module "alb_ssl_ingress" {
   ingress_name         = var.ingress_name
   load_balancer_name   = var.load_balancer_name
   ingress_class_name   = local.ingress_class_name
+  ingress_hostnames    = var.ingress_hostnames
   alb_scheme           = var.alb_scheme
   ssl_redirect_enabled = var.ssl_redirect_enabled
   ssl_policy           = "ELBSecurityPolicy-TLS-1-2-2017-01"

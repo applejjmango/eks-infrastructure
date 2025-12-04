@@ -111,6 +111,7 @@ resource "kubernetes_ingress_v1" "this" {
       "alb.ingress.kubernetes.io/success-codes"                = var.health_check.success_codes
       "alb.ingress.kubernetes.io/healthy-threshold-count"      = var.health_check.healthy_threshold
       "alb.ingress.kubernetes.io/unhealthy-threshold-count"    = var.health_check.unhealthy_threshold
+      "external-dns.alpha.kubernetes.io/hostname"              = length(var.ingress_hostnames) > 0 ? join(",", var.ingress_hostnames) : null
 
       # =========== SSL/TLS 설정 ===========
       "alb.ingress.kubernetes.io/listen-ports" = jsonencode([

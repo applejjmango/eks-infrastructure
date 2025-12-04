@@ -81,6 +81,12 @@ variable "alb_scheme" {
   default     = "internet-facing"
 }
 
+variable "ingress_hostnames" {
+  description = "Ingress에 연결할 호스트네임 목록 (ExternalDNS 연동용)"
+  type        = list(string)
+  default     = [] # 예: ["playdevops.click", "api.playdevops.click"]
+}
+
 # -----------------------------------------------------------------------------
 # SSL/TLS 설정
 # -----------------------------------------------------------------------------
