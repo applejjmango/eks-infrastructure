@@ -26,19 +26,26 @@ data "terraform_remote_state" "platform" {
   }
 }
 
+data "aws_acm_certificate" "wildcard" {
+  domain      = var.acm_domain_name
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
 
 # ============================================
 # Local Values
 # ============================================
 locals {
-  # Platform Remote State에서 IngressClass 이름 가져오기
-  ingress_class_name = data.terraform_remote_state.platform.outputs.ingress_class_name
+  # # Platform Remote State에서 IngressClass 이름 가져오기
+  # ingress_class_name = data.terraform_remote_state.platform.outputs.ingress_class_name
 
-  # 외부 노출 앱만 필터링 (Ingress에 포함)
-  external_apps = [for app in var.apps : app if app.expose_external]
+  # # 외부 노출 앱만 필터링 (Ingress에 포함)
+  # external_apps_names = [for name, config in var.microservices : name if config.expose_external]
 
-  # 모든 앱 (Deployment + Service는 모두 생성)
-  all_apps = { for app in var.apps : app.name => app }
+  common_tags = merge(var.tags, {
+    Environment = var.environment
+    Project     = var.project_name
+  })
 }
 
 # =============================================================================
@@ -56,15 +63,18 @@ locals {
 #   - 원자적 배포/롤백 가능
 # =============================================================================
 module "apps" {
-  source   = "../../../../modules/kubernetes/app"
-  for_each = local.all_apps
+  source = "../../../../modules/kubernetes/app"
+
+  # [핵심] microservices 맵을 순회하며 앱 생성
+  for_each = var.microservices
 
   # -----------------------------
   # 기본 설정
   # -----------------------------
-  app_name        = each.value.name
-  environment     = var.environment
-  namespace       = var.namespace
+  app_name    = each.key
+  environment = var.environment
+  namespace   = var.namespace
+
   container_image = each.value.image
   replicas        = each.value.replicas
   container_port  = each.value.container_port
@@ -123,8 +133,9 @@ module "apps" {
 
 module "alb_ssl_ingress" {
   source = "../../../../modules/kubernetes/ingress/alb-ssl"
-  count  = var.enable_ingress && length(local.external_apps) > 0 ? 1 : 0
 
+  # [핵심] 외부 노출(expose_external=true)인 앱만 필터링하여 Ingress 생성
+  for_each = { for k, v in var.microservices : k => v if v.expose_external && var.enable_ingress }
   # -----------------------------
   # 기본 설정
   # -----------------------------
@@ -136,8 +147,8 @@ module "alb_ssl_ingress" {
   # ACM 인증서
   # -----------------------------
   create_acm_certificate = var.create_acm_certificate
+  acm_certificate_arn    = data.aws_acm_certificate.wildcard.arn
   acm_domain_name        = var.acm_domain_name
-  acm_certificate_arn    = var.acm_certificate_arn
   acm_validation_method  = "DNS"
 
   hosted_zone_id = var.hosted_zone_id
@@ -145,44 +156,50 @@ module "alb_ssl_ingress" {
   # -----------------------------
   # Ingress 설정
   # -----------------------------
-  ingress_name         = var.ingress_name
+  ingress_name         = "${var.environment}-${each.key}-ingress"
   load_balancer_name   = var.load_balancer_name
-  ingress_class_name   = local.ingress_class_name
-  ingress_hostnames    = var.ingress_hostnames
+  ingress_class_name   = var.ingress_class_name
   alb_scheme           = var.alb_scheme
   ssl_redirect_enabled = var.ssl_redirect_enabled
   ssl_policy           = "ELBSecurityPolicy-TLS-1-2-2017-01"
 
+
   # -----------------------------
-  # Health Check
+  # [핵심] Ingress Group 설정 주입
   # -----------------------------
-  health_check = {
-    protocol            = "HTTP"
-    port                = "traffic-port"
-    interval_seconds    = 15
-    timeout_seconds     = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    success_codes       = "200"
+  additional_annotations = {
+    # 1. 그룹핑: 이 이름이 같은 Ingress들은 물리적으로 하나의 ALB가 됨
+    "alb.ingress.kubernetes.io/group.name" = var.ingress_group_name
+
+    # 2. 순서: 경로 우선순위 제어 (낮을수록 먼저 평가)
+    "alb.ingress.kubernetes.io/group.order" = tostring(each.value.ingress_order)
+
+    # 3. 헬스체크: 각 서비스에 맞는 경로로 개별 설정
+    "alb.ingress.kubernetes.io/healthcheck-path" = each.value.health_check_path
   }
+
+  # -----------------------------
+  # 호스트 및 백엔드 연결
+  # -----------------------------
+  ingress_hostnames = each.value.ingress_hosts
 
   # -----------------------------
   # 백엔드 서비스 연결
   # 실무: App 모듈의 output을 참조하여 Service 연결
   # -----------------------------
   backend_services = [
-    for app in local.external_apps : {
-      name              = module.apps[app.name].service_name
-      port              = module.apps[app.name].service_port
-      path              = app.ingress_path
-      path_type         = app.ingress_path_type
-      health_check_path = app.health_check_path
-      is_default        = app.is_default
+    {
+      name              = module.apps[each.key].service_name
+      port              = module.apps[each.key].service_port
+      path              = each.value.ingress_path
+      path_type         = each.value.ingress_path_type
+      health_check_path = each.value.health_check_path
+      is_default        = each.value.is_default
     }
   ]
 
   # 태그
-  tags = var.tags
+  tags = local.common_tags
 
   # App 모듈이 먼저 생성되어야 함
   depends_on = [module.apps]

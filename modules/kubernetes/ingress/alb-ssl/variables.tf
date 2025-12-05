@@ -87,6 +87,14 @@ variable "ingress_hostnames" {
   default     = [] # 예: ["playdevops.click", "api.playdevops.click"]
 }
 
+# =============================================================================
+# 추가 Annotations (Ingress Group, WAF 등 설정 주입용)
+# =============================================================================variable "additional_annotations" {
+variable "additional_annotations" {
+  description = "Ingress 리소스에 병합할 추가 Annotations (예: group.name, group.order)"
+  type        = map(string)
+  default     = {}
+}
 # -----------------------------------------------------------------------------
 # SSL/TLS 설정
 # -----------------------------------------------------------------------------
@@ -144,25 +152,7 @@ variable "backend_services" {
 
 
 
-  # 예시:
-  # [
-  #   {
-  #     name              = "app1-service"
-  #     port              = 80
-  #     path              = "/app1"
-  #     path_type         = "Prefix"
-  #     health_check_path = "/app1/index.html"
-  #     is_default        = false
-  #   },
-  #   {
-  #     name              = "app3-service"
-  #     port              = 80
-  #     path              = "/"
-  #     path_type         = "Prefix"
-  #     health_check_path = "/index.html"
-  #     is_default        = true  # 기본 백엔드
-  #   }
-  # ]
+
 }
 
 # =============================================================================

@@ -24,7 +24,7 @@ locals {
   certificate_arn = var.create_acm_certificate ? aws_acm_certificate_validation.this[0].certificate_arn : var.acm_certificate_arn
 
   # 기본 백엔드 찾기
-  default_backend = [for svc in var.backend_services : svc if svc.is_default][0]
+  default_backend = one([for svc in var.backend_services : svc if svc.is_default])
 
   # 경로 기반 라우팅 서비스 (기본 백엔드 제외)
   path_backends = [for svc in var.backend_services : svc if !svc.is_default]
@@ -98,7 +98,7 @@ resource "kubernetes_ingress_v1" "this" {
     namespace = var.namespace
     labels    = local.common_labels
 
-    annotations = {
+    annotations = merge({
       # =========== ALB 기본 설정 ===========
       "alb.ingress.kubernetes.io/load-balancer-name" = var.load_balancer_name
       "alb.ingress.kubernetes.io/scheme"             = var.alb_scheme
@@ -111,7 +111,7 @@ resource "kubernetes_ingress_v1" "this" {
       "alb.ingress.kubernetes.io/success-codes"                = var.health_check.success_codes
       "alb.ingress.kubernetes.io/healthy-threshold-count"      = var.health_check.healthy_threshold
       "alb.ingress.kubernetes.io/unhealthy-threshold-count"    = var.health_check.unhealthy_threshold
-      "external-dns.alpha.kubernetes.io/hostname"              = length(var.ingress_hostnames) > 0 ? join(",", var.ingress_hostnames) : null
+
 
       # =========== SSL/TLS 설정 ===========
       "alb.ingress.kubernetes.io/listen-ports" = jsonencode([
@@ -123,7 +123,15 @@ resource "kubernetes_ingress_v1" "this" {
 
       # =========== SSL 리다이렉트 ===========
       "alb.ingress.kubernetes.io/ssl-redirect" = var.ssl_redirect_enabled ? "443" : ""
-    }
+
+      # ▼▼▼ [추가] ExternalDNS가 이 줄을 보고 Route53을 업데이트합니다! ▼▼▼
+      "external-dns.alpha.kubernetes.io/hostname" = length(var.ingress_hostnames) > 0 ? join(",", var.ingress_hostnames) : null
+
+
+      },
+      # [추가 설정 병합] 외부에서 주입된 group.name, group.order 등이 여기서 합쳐짐
+      var.additional_annotations
+    )
   }
 
   spec {
@@ -131,36 +139,42 @@ resource "kubernetes_ingress_v1" "this" {
 
     # =========== 기본 백엔드 ===========
     # 매칭되는 경로가 없을 때 라우팅
-    default_backend {
-      service {
-        name = local.default_backend.name
-        port {
-          number = local.default_backend.port
+    dynamic "default_backend" {
+      for_each = local.default_backend != null ? [local.default_backend] : []
+      iterator = db # 반복자 이름을 'db'로 명시
+      content {
+        service {
+          name = db.value.name
+          port {
+            number = db.value.port
+          }
         }
       }
     }
 
     # =========== 경로 기반 라우팅 ===========
-    rule {
-      http {
-        dynamic "path" {
-          for_each = local.path_backends
-          content {
-            backend {
-              service {
-                name = path.value.name
-                port {
-                  number = path.value.port
+    dynamic "rule" {
+      for_each = (length(var.ingress_hostnames) > 0 && length(local.path_backends) > 0) ? var.ingress_hostnames : []
+      content {
+        host = rule.value # 리스트의 도메인 이름 (없으면 null)
+        http {
+          dynamic "path" {
+            for_each = local.path_backends
+            iterator = backend_path
+            content {
+              path      = backend_path.value.path
+              path_type = backend_path.value.path_type
+              backend {
+                service {
+                  name = backend_path.value.name
+                  port { number = backend_path.value.port }
                 }
               }
             }
-            path      = path.value.path
-            path_type = path.value.path_type
           }
         }
       }
     }
   }
-
   depends_on = [aws_acm_certificate_validation.this]
 }

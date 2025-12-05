@@ -68,6 +68,11 @@ variable "ingress_name" {
   type        = string
   default     = "app-ingress"
 }
+variable "ingress_class_name" {
+  description = "Ingress Class 이름"
+  type        = string
+  default     = "alb"
+}
 
 variable "load_balancer_name" {
   description = "ALB 이름 (AWS 콘솔 표시용)"
@@ -87,36 +92,52 @@ variable "ssl_redirect_enabled" {
   default     = true
 }
 
+# =============================================================================
+# [추가] Ingress Group 설정
+# =============================================================================
+variable "ingress_group_name" {
+  description = "Ingress Group 이름 (여러 Ingress를 이 이름의 ALB 하나로 통합)"
+  type        = string
+  default     = null # null이면 개별 Ingress 생성 (기존 동작 유지)
+}
+
+variable "ingress_group_order" {
+  description = "Ingress Group 내에서 이 Ingress의 우선순위 (낮을수록 먼저 평가됨)"
+  type        = number
+  default     = 10
+}
+
 # -----------------------------------------------------------------------------
 # 앱 설정
 # -----------------------------------------------------------------------------
-variable "apps" {
-  description = "배포할 애플리케이션 목록"
-  type = list(object({
-    name              = string # 앱 이름
-    image             = string # 컨테이너 이미지
-    replicas          = number # Pod 복제본 수
-    container_port    = number # 컨테이너 포트
-    health_check_path = string # 헬스체크 경로
+variable "microservices" {
+  description = "마이크로서비스 배포 설정 맵 (Key: 서비스명)"
+  type = map(object({
+    # 1. 컨테이너 설정
+    image             = string
+    replicas          = number
+    container_port    = number
+    service_port      = number
+    health_check_path = string
 
-    # Ingress 라우팅 설정
-    ingress_path      = string # URL 경로 (예: /app1)
-    ingress_path_type = string # Prefix, Exact
-    is_default        = bool   # 기본 백엔드 여부
-
-    # 외부 노출 여부 (Ingress에 포함할지)
-    expose_external = bool # true: Ingress에 포함, false: 내부용
-
-    # 리소스 설정 (선택적)
+    # 2. 리소스 제한 (선택적)
     resources = optional(object({
       requests_cpu    = string
       requests_memory = string
       limits_cpu      = string
       limits_memory   = string
     }))
-  }))
-}
 
+    # 3. Ingress 라우팅 설정
+    expose_external   = bool         # true: Ingress 생성, false: ClusterIP만 생성
+    ingress_hosts     = list(string) # 연결할 도메인 목록
+    ingress_path      = string       # URL 경로
+    ingress_path_type = string       # Prefix 등
+    ingress_order     = number       # Ingress Group 내 우선순위 (필수)
+    is_default        = bool         # Default Backend 여부
+  }))
+  default = {}
+}
 
 variable "hosted_zone_id" {
   description = "ACM 검증을 위한 Route53 Hosted Zone ID"
