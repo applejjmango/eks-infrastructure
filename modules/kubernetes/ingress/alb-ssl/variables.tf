@@ -48,6 +48,12 @@ variable "acm_domain_name" {
   default     = null
 }
 
+variable "acm_subject_alternative_names" {
+  description = "인증서에 추가할 도메인 목록 (SANs)"
+  type        = list(string)
+  default     = []
+}
+
 variable "acm_validation_method" {
   description = "ACM 인증서 검증 방법 (DNS, EMAIL)"
   type        = string

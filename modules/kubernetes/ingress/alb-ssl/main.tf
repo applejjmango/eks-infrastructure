@@ -39,7 +39,10 @@ locals {
 resource "aws_acm_certificate" "this" {
   count = var.create_acm_certificate ? 1 : 0
 
-  domain_name       = var.acm_domain_name
+  domain_name = var.acm_domain_name
+
+  subject_alternative_names = var.acm_subject_alternative_names
+
   validation_method = var.acm_validation_method
 
   tags = merge(local.common_labels, var.tags, {

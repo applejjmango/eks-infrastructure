@@ -26,11 +26,6 @@ data "terraform_remote_state" "platform" {
   }
 }
 
-data "aws_acm_certificate" "wildcard" {
-  domain      = var.acm_domain_name
-  statuses    = ["ISSUED"]
-  most_recent = true
-}
 
 # ============================================
 # Local Values
@@ -146,10 +141,10 @@ module "alb_ssl_ingress" {
   # -----------------------------
   # ACM 인증서
   # -----------------------------
-  create_acm_certificate = var.create_acm_certificate
-  acm_certificate_arn    = data.aws_acm_certificate.wildcard.arn
-  acm_domain_name        = var.acm_domain_name
-  acm_validation_method  = "DNS"
+  create_acm_certificate        = var.create_acm_certificate
+  acm_domain_name               = var.acm_domain_name
+  acm_validation_method         = "DNS"
+  acm_subject_alternative_names = var.acm_subject_alternative_names
 
   hosted_zone_id = var.hosted_zone_id
 
