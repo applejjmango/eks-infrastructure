@@ -41,6 +41,9 @@ locals {
     Environment = var.environment
     Project     = var.project_name
   })
+
+  # [추가] Platform State에서 인증서 ARN 가져오기
+  acm_certificate_arn = data.terraform_remote_state.platform.outputs.acm_certificate_arn
 }
 
 # =============================================================================
@@ -143,15 +146,8 @@ module "alb_ssl_ingress" {
   # Ingress도 해당 앱의 네임스페이스에 생성되어야 함
   namespace = coalesce(each.value.namespace, var.namespace)
 
-  # -----------------------------
-  # ACM 인증서
-  # -----------------------------
-  create_acm_certificate        = var.create_acm_certificate
-  acm_domain_name               = var.acm_domain_name
-  acm_validation_method         = "DNS"
-  acm_subject_alternative_names = var.acm_subject_alternative_names
-
-  hosted_zone_id = var.hosted_zone_id
+  # [핵심] 인증서 ARN 주입
+  acm_certificate_arn = local.acm_certificate_arn
 
   # -----------------------------
   # Ingress 설정

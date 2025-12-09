@@ -30,35 +30,15 @@ variable "namespace" {
 # -----------------------------------------------------------------------------
 # ACM 인증서 설정
 # -----------------------------------------------------------------------------
-variable "create_acm_certificate" {
-  description = "ACM 인증서 생성 여부 (기존 인증서 사용 시 false)"
-  type        = bool
-  default     = true
-}
+
 
 variable "acm_certificate_arn" {
   description = "기존 ACM 인증서 ARN (create_acm_certificate=false 시 필수)"
   type        = string
-  default     = null
 }
 
-variable "acm_domain_name" {
-  description = "ACM 인증서 도메인 (예: *.example.com)"
-  type        = string
-  default     = null
-}
 
-variable "acm_subject_alternative_names" {
-  description = "인증서에 추가할 도메인 목록 (SANs)"
-  type        = list(string)
-  default     = []
-}
 
-variable "acm_validation_method" {
-  description = "ACM 인증서 검증 방법 (DNS, EMAIL)"
-  type        = string
-  default     = "DNS"
-}
 
 # -----------------------------------------------------------------------------
 # Ingress 기본 설정

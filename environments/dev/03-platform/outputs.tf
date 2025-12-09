@@ -15,12 +15,16 @@ output "ebs_csi_driver_addon_id" {
   value       = var.enable_ebs_csi_driver ? module.ebs_csi_driver[0].addon_id : null
 }
 
+#  생성된 인증서 ARN 출력 (App Tier에서 사용)
+output "acm_certificate_arn" {
+  description = "The ARN of the public wildcard ACM certificate"
+  value       = module.acm.acm_certificate_arn
+}
+
 output "ebs_csi_driver_addon_version" {
   description = "EBS CSI Driver add-on version"
   value       = var.enable_ebs_csi_driver ? module.ebs_csi_driver[0].addon_version : null
 }
-
-
 
 # ============================================
 # Verification Commands

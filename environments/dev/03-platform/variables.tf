@@ -23,14 +23,24 @@ variable "project_name" {
   default     = "playdevops"
 }
 
-
 variable "division" {
-  description = "Organizational or technical division responsible for this infrastructure"
+  description = "Organizational or technical division"
   type        = string
   default     = "CloudInfra"
 }
 
+# ============================================
+# ACM & Route53 Variables (통합됨)
+# ============================================
+variable "acm_domain_name" {
+  description = "ACM 인증서를 생성할 도메인 이름 (예: playdevops.click)"
+  type        = string
+}
 
+variable "hosted_zone_id" {
+  description = "Route53 Hosted Zone ID (DNS 검증 및 ExternalDNS용)"
+  type        = string
+}
 
 # ============================================
 # EBS CSI Driver Variables
@@ -42,13 +52,13 @@ variable "enable_ebs_csi_driver" {
 }
 
 variable "ebs_csi_driver_addon_version" {
-  description = "EBS CSI Driver add-on version (leave empty for latest)"
+  description = "EBS CSI Driver add-on version"
   type        = string
   default     = ""
 }
 
 variable "ebs_csi_driver_resolve_conflicts_on_create" {
-  description = "How to resolve conflicts (OVERWRITE or NONE)"
+  description = "How to resolve conflicts"
   type        = string
   default     = "OVERWRITE"
 }
@@ -60,74 +70,6 @@ variable "ebs_csi_driver_use_aws_managed_policy" {
 }
 
 # ============================================
-# Storage Configuration
-# ============================================
-variable "storage_class_name" {
-  description = "Storage class name for EBS volumes"
-  type        = string
-  default     = "ebs-sc"
-}
-
-variable "pvc_storage_size" {
-  description = "PVC storage size"
-  type        = string
-  default     = "4Gi"
-}
-
-# ============================================
-# MySQL Configuration
-# ============================================
-variable "mysql_root_password" {
-  description = "MySQL root password"
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "mysql_image" {
-  description = "MySQL container image"
-  type        = string
-  default     = "mysql:5.6"
-}
-
-# ============================================
-# WebApp Configuration
-# ============================================
-variable "webapp_replicas" {
-  description = "Number of webapp replicas"
-  type        = number
-  default     = 1
-}
-
-variable "webapp_image" {
-  description = "WebApp container image"
-  type        = string
-  default     = "stacksimplify/kube-usermanagement-microservice:1.0.0"
-}
-
-# ============================================
-# Service Configuration
-# ============================================
-variable "enable_loadbalancer" {
-  description = "Enable LoadBalancer service"
-  type        = bool
-  default     = true
-}
-
-variable "enable_nodeport" {
-  description = "Enable NodePort service"
-  type        = bool
-  default     = false
-}
-
-variable "nodeport_port" {
-  description = "NodePort port number"
-  type        = number
-  default     = 31280
-}
-
-
-# ============================================
 # AWS Load Balancer Controller Variables
 # ============================================
 variable "enable_alb_controller" {
@@ -137,13 +79,13 @@ variable "enable_alb_controller" {
 }
 
 variable "alb_controller_chart_version" {
-  description = "Helm chart version for AWS Load Balancer Controller"
+  description = "Helm chart version"
   type        = string
-  default     = "" # Use latest
+  default     = ""
 }
 
 variable "alb_controller_image_repository" {
-  description = "Docker image repository for AWS Load Balancer Controller (region-specific)"
+  description = "Docker image repository"
   type        = string
   default     = "602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon/aws-load-balancer-controller"
 }
@@ -155,7 +97,7 @@ variable "alb_controller_ingress_class_name" {
 }
 
 variable "alb_controller_is_default" {
-  description = "Set AWS Load Balancer Controller Ingress Class as default"
+  description = "Set as default Ingress Class"
   type        = bool
   default     = true
 }
@@ -170,15 +112,12 @@ variable "enable_external_dns" {
 }
 
 variable "external_dns_chart_version" {
-  description = "Helm chart version for ExternalDNS"
+  description = "Helm chart version"
   type        = string
   default     = "1.14.5"
 }
 
-variable "external_dns_hosted_zone_id" {
-  description = "Route53 Hosted Zone ID for ExternalDNS to manage"
-  type        = string
-}
+# [삭제됨] external_dns_hosted_zone_id는 hosted_zone_id로 통합되어 삭제했습니다.
 
 variable "external_dns_domain_filters" {
   description = "List of domains for ExternalDNS to manage"

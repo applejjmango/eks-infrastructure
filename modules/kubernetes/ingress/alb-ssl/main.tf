@@ -21,7 +21,7 @@ locals {
   }
 
   # 인증서 ARN 결정 (신규 생성 vs 기존 사용)
-  certificate_arn = var.create_acm_certificate ? aws_acm_certificate_validation.this[0].certificate_arn : var.acm_certificate_arn
+  certificate_arn = var.acm_certificate_arn
 
   # 기본 백엔드 찾기
   default_backend = one([for svc in var.backend_services : svc if svc.is_default])
@@ -30,60 +30,7 @@ locals {
   path_backends = [for svc in var.backend_services : svc if !svc.is_default]
 }
 
-# =============================================================================
-# ACM 인증서
-# =============================================================================
-# 실무: HTTPS를 위한 SSL/TLS 인증서
-# 왜 ACM: 무료, 자동 갱신, AWS 서비스와 네이티브 통합
 
-resource "aws_acm_certificate" "this" {
-  count = var.create_acm_certificate ? 1 : 0
-
-  domain_name = var.acm_domain_name
-
-  subject_alternative_names = var.acm_subject_alternative_names
-
-  validation_method = var.acm_validation_method
-
-  tags = merge(local.common_labels, var.tags, {
-    Name = "${var.project_name}-${var.environment}-cert"
-  })
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# =============================================================================
-# [추가] ACM 검증용 DNS 레코드 생성 (Route53)
-# =============================================================================
-resource "aws_route53_record" "validation" {
-  # ACM 인증서가 생성될 때만 실행, domain_validation_options를 순회하며 레코드 생성
-  for_each = var.create_acm_certificate ? {
-    for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  } : {}
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = var.hosted_zone_id # 변수에서 입력받은 Zone ID 사용
-}
-
-# =============================================================================
-# [추가] ACM 인증서 검증 대기
-# =============================================================================
-resource "aws_acm_certificate_validation" "this" {
-  count = var.create_acm_certificate ? 1 : 0
-
-  certificate_arn         = aws_acm_certificate.this[0].arn
-  validation_record_fqdns = [for record in aws_route53_record.validation : record.fqdn]
-}
 
 # =============================================================================
 # Kubernetes Ingress (ALB)
@@ -179,5 +126,4 @@ resource "kubernetes_ingress_v1" "this" {
       }
     }
   }
-  depends_on = [aws_acm_certificate_validation.this]
 }

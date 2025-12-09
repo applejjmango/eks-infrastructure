@@ -114,56 +114,42 @@ module "external_dns" {
   source = "../../../modules/addons/external-dns"
   count  = var.enable_external_dns ? 1 : 0
 
-  # 기본 정보
   cluster_name = local.eks_cluster_name
   aws_region   = var.aws_region
 
-  # OIDC 정보 (Remote State에서 가져옴)
   oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
   oidc_provider     = data.terraform_remote_state.eks.outputs.oidc_provider
 
-  # Route53 설정
-  hosted_zone_id = var.external_dns_hosted_zone_id
+  # [수정 완료] 통합된 hosted_zone_id 변수 사용
+  hosted_zone_id = var.hosted_zone_id
   domain_filters = var.external_dns_domain_filters
 
-  # Namespace (kube-system)
-  namespace = "kube-system"
-
-  # Helm 버전
+  namespace     = "kube-system"
   chart_version = var.external_dns_chart_version
 
   tags = local.common_tags
 }
 
-/*
+
 
 # ============================================
-# Cert Manager (with IRSA)
+# [NEW] ACM Certificate (Platform Shared)
 # ============================================
-module "cert_manager" {
-  source = "../../../modules/addons/cert-manager"
-  count  = var.enable_cert_manager ? 1 : 0
+module "acm" {
+  source = "../../../modules/security/acm"
 
-  name             = "${local.name}-cert-manager"
-  eks_cluster_name = local.eks_cluster_name
+  # Apex(루트) 도메인을 메인으로 설정 (예: playdevops.click)
+  domain_name = var.acm_domain_name
 
-  # OIDC Provider
-  oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
-  oidc_provider     = data.terraform_remote_state.eks.outputs.oidc_provider
+  # 와일드카드를 SANs에 자동 추가 (예: *.playdevops.click)
+  subject_alternative_names = [
+    "*.${var.acm_domain_name}"
+  ]
 
-  # Route53 for DNS-01 challenge
-  hosted_zone_id = var.cert_manager_hosted_zone_id
-
-  # Helm Chart
-  chart_version = var.cert_manager_chart_version
-
-  # Let's Encrypt
-  acme_email  = var.cert_manager_acme_email
-  acme_server = var.cert_manager_acme_server
-
-  tags = local.common_tags
+  hosted_zone_id = var.hosted_zone_id
+  tags           = local.common_tags
 }
-
+/*
 # ============================================
 # Cluster Autoscaler (with IRSA)
 # ============================================
