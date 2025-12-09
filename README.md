@@ -1,3 +1,7 @@
+[TO-DO]
+
+1. Public ALB → Private ALB + API Gateway
+
 # EKS Infrastructure Project (Terraform)
 
 This repository contains Terraform code to build and manage a production-ready EKS (Elastic Kubernetes Service) cluster on AWS.
@@ -107,3 +111,21 @@ Git에 올리는 것
 명령어 설명순서
 ./scripts/apply.sh dev - 전체 배포 01→02→03→04
 ./scripts/destroy.sh dev - 전체 삭제 04→03→02→01
+
+AWS Organization
+├── Shared Account (ECR, ArgoCD)
+├── Dev Account (EKS Dev Cluster)
+└── Prod Account (EKS Prod Cluster)
+├── VPC (Private Subnet Only for Nodes)
+│ ├── Node Group [General]: Web, App
+│ ├── Node Group [Core]: Order, Wallet (Tainted)
+│ └── Node Group [System]: Logging, Ingress
+│
+├── Network
+│ ├── Public ALB (WAF) -> User Traffic
+│ └── Private ALB (VPN) -> Admin Traffic
+│
+└── Security
+├── IAM Roles for Service Accounts (IRSA)
+├── Secrets Manager + External Secrets
+└── Network Policies (Deny-All by default)

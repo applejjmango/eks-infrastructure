@@ -68,11 +68,15 @@ module "apps" {
   # -----------------------------
   app_name    = each.key
   environment = var.environment
-  namespace   = var.namespace
+
+  # 앱별 네임스페이스 우선 적용 (없으면 기본값 사용)
+  namespace        = coalesce(each.value.namespace, var.namespace)
+  create_namespace = true # 각 앱의 네임스페이스 자동 생성
 
   container_image = each.value.image
   replicas        = each.value.replicas
   container_port  = each.value.container_port
+  service_port    = each.value.service_port
 
   # -----------------------------
   # Health Check
@@ -85,7 +89,6 @@ module "apps" {
   # -----------------------------
   create_service = true
   service_type   = each.value.expose_external ? "NodePort" : "ClusterIP"
-  service_port   = 80
 
   # ALB Ingress Controller용 헬스체크 경로
   service_annotations = each.value.expose_external ? {
@@ -136,7 +139,9 @@ module "alb_ssl_ingress" {
   # -----------------------------
   environment  = var.environment
   project_name = var.project_name
-  namespace    = var.namespace
+
+  # Ingress도 해당 앱의 네임스페이스에 생성되어야 함
+  namespace = coalesce(each.value.namespace, var.namespace)
 
   # -----------------------------
   # ACM 인증서

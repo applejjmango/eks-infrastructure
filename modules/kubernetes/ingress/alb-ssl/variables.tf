@@ -84,7 +84,7 @@ variable "load_balancer_name" {
 variable "alb_scheme" {
   description = "ALB 스킴 (internet-facing, internal)"
   type        = string
-  default     = "internet-facing"
+  default     = "internet-facing" # or "internal"
 }
 
 variable "ingress_hostnames" {

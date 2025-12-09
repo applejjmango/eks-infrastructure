@@ -120,6 +120,7 @@ variable "microservices" {
   description = "마이크로서비스 배포 설정 맵 (Key: 서비스명)"
   type = map(object({
     # 1. 컨테이너 설정
+    namespace         = optional(string) # user-service, wallet-service
     image             = string
     replicas          = number
     container_port    = number
